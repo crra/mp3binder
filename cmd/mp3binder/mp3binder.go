@@ -185,6 +185,14 @@ func collectFilesFromDirectory(c *context) error {
 		return nil
 	}
 
+	if !filepath.IsAbs(*c.inputDirectory) {
+		abs, err := filepath.Abs(*c.inputDirectory)
+		if err != nil {
+			return fmt.Errorf("can not get absolute path for directory '%s', %v", *c.inputDirectory, err)
+		}
+		c.inputDirectory = &abs
+	}
+
 	files := []string{}
 
 	err := filepath.Walk(*c.inputDirectory, func(path string, info os.FileInfo, err error) error {
