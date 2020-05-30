@@ -35,27 +35,11 @@ const (
 )
 
 var bundles = []bundle{
-	{sourcePath: "cmd/mp3binder.go", targetName: "mp3binder"},
-}
-
-func flagBool(long, short string, defaultValue bool, usage string) *bool {
-	var val bool
-	flag.BoolVar(&val, short, defaultValue, usage)
-	flag.BoolVar(&val, long, defaultValue, usage)
-
-	return &val
-}
-
-func flagString(long, short string, defaultValue string, usage string) *string {
-	var val string
-	flag.StringVar(&val, short, defaultValue, usage)
-	flag.StringVar(&val, long, defaultValue, usage)
-
-	return &val
+	{sourcePath: "cmd/mp3binder/mp3binder.go", targetName: "mp3binder"},
 }
 
 var (
-	productionLdFlags = []string{} //"-s", "-w"}
+	productionLdFlags = []string{"-s", "-w"}
 )
 
 func getLatestGitTag(defaultValue string) string {
@@ -70,7 +54,6 @@ func getLatestGitTag(defaultValue string) string {
 
 func isSandboxClean() bool {
 	// https://stackoverflow.com/questions/3878624/how-do-i-programmatically-determine-if-there-are-uncommitted-changes
-	// Refresh index
 	commands :=
 		[][]string{
 			{"git", "update-index", "--refresh"},
@@ -103,8 +86,8 @@ func getVersion() string {
 }
 
 func main() {
-	buildAll := flagBool("all", "a", false, "Build all targets")
-	buildProduction := flagBool("production", "p", false, "Build for production")
+	buildAll := flag.Bool("a", false, "Build all targets")
+	buildProduction := flag.Bool("p", false, "Build for production")
 	flag.Parse()
 
 	buildTargets := []target{}
