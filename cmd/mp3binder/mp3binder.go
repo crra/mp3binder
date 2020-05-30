@@ -140,8 +140,8 @@ func main() {
 	flag.Var(flagext.NewStringPtrFlag(&ctx.outputFilename), "out", "output filepath. Defaults to name of the folder of the first file provided")
 	flag.Var(flagext.NewStringPtrFlag(&ctx.inputDirectory), "dir", "directory of files to merge")
 	flag.Var(flagext.NewStringPtrFlag(&ctx.interlaceFilename), "interlace", "interlace a spacer file (e.g. silence) between each input file")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.id3tags), "tapply", "apply id3v2 tags to outputfile.\nTakes the format 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
-	flag.Var(flagext.NewIntPtrFlag(&ctx.copyMetadataFromFileIndex), "tcopy", "copy the ID3 metadata tag from the n-th input file, staring with 1")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.id3tags), "tapply", "apply id3v2 tags to output file.\nTakes the format 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
+	flag.Var(flagext.NewIntPtrFlag(&ctx.copyMetadataFromFileIndex), "tcopy", "copy the ID3 metadata tag from the n-th input file, starting with 1")
 
 	flag.Parse()
 	ctx.showInformationDuringProcessing = !*flagQuiet
