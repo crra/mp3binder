@@ -195,36 +195,14 @@ func collectFilesFromDirectory(c *context) error {
 
 	files := []string{}
 
-	err := filepath.Walk(*c.inputDirectory, func(path string, info os.FileInfo, err error) error {
-		switch {
-		case err != nil:
-			return err
-		case info == nil:
-			return fmt.Errorf("error getting file info for '%s'", path)
-		}
-
-		// Skip directories and don't descend
-		if info.IsDir() {
-			if path != *c.inputDirectory {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		ext := strings.ToLower(filepath.Ext(info.Name()))
-		if ext == extOfMp3 {
-			abs, err := filepath.Abs(path)
-			if err != nil {
-				return fmt.Errorf("can get absolute location of media file '%s', %v", path, err)
-			}
-			files = append(files, abs)
-		}
-
-		return nil
-	})
-
+	dirContent, err := ioutil.ReadDir(*c.inputDirectory)
 	if err != nil {
 		return fmt.Errorf("can not read media files from directory, %v", err)
+	}
+	for _, file := range dirContent {
+		if !file.IsDir() && strings.ToLower(filepath.Ext(file.Name())) == extOfMp3 {
+			files = append(files, filepath.Join(*c.inputDirectory, file.Name()))
+		}
 	}
 
 	if len(files) == 0 && c.showInformationDuringProcessing {
