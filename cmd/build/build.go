@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/zip"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -125,6 +127,34 @@ func main() {
 	wg.Wait()
 }
 
+func addFileToZip(zipWriter *zip.Writer, sourcePath, zipPath string) error {
+	fileToZip, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer fileToZip.Close()
+
+	info, err := fileToZip.Stat()
+	if err != nil {
+		return err
+	}
+
+	header, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return err
+	}
+
+	header.Name = zipPath
+	header.Method = zip.Deflate
+
+	writer, err := zipWriter.CreateHeader(header)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(writer, fileToZip)
+	return err
+}
+
 func build(wg *sync.WaitGroup, b bundle, t target, l *log.Logger, variables map[string]string, outFolder string, isProductBuild bool) {
 	defer wg.Done()
 	l.Print("Start building")
@@ -139,7 +169,8 @@ func build(wg *sync.WaitGroup, b bundle, t target, l *log.Logger, variables map[
 		targetName = targetName + ".exe"
 	}
 
-	args := []string{"build", "-o", path.Join(outFolder, buildType, t.os, targetName)}
+	outfile := path.Join(outFolder, buildType, t.os, targetName)
+	args := []string{"build", "-o", outfile}
 
 	// Linker flags
 	if isProductBuild || len(variables) > 0 {
@@ -159,10 +190,30 @@ func build(wg *sync.WaitGroup, b bundle, t target, l *log.Logger, variables map[
 	args = append(args, b.sourcePath)
 	cmd := exec.Command("go", args...)
 	cmd.Env = append(os.Environ(), "GOOS="+t.os, "GOARCH="+t.arch)
-	output, err := cmd.CombinedOutput()
+
+	err := cmd.Start()
 	if err != nil {
-		log.Println(err)
+		log.Fatalf("Build failed, %v", err)
+	}
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatalf("Build failed, %v", err)
 	}
 
-	fmt.Print(string(output))
+	if isProductBuild {
+		zipFileName := path.Join(outFolder, buildType, t.os, fmt.Sprintf("%s-%s.zip", t.os, b.targetName))
+		newZipFile, err := os.Create(zipFileName)
+		if err != nil {
+			log.Fatalf("Can't create zip file, %v", err)
+		}
+		defer newZipFile.Close()
+
+		zipWriter := zip.NewWriter(newZipFile)
+		defer zipWriter.Close()
+
+		err = addFileToZip(zipWriter, outfile, targetName)
+		if err != nil {
+			log.Fatalf("Can't create zip file, %v", err)
+		}
+	}
 }
