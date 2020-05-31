@@ -9,6 +9,9 @@ It is based on: http://www.dmulholl.com/dev/mp3cat.html and adds some more "batt
 # Usage
 
 ```
+  -cover value
+        use image file as artwork
+
   -d    prints debug information for each processing step
 
   -dir value

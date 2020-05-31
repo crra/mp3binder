@@ -22,10 +22,29 @@ var version = "unversioned"
 const (
 	extOfMp3               = ".mp3"
 	magicInterlaceFilename = "_interlace.mp3"
+	tagCover               = "APIC"
 
 	pairSeparator  = ","
 	valueSeparator = "="
 )
+
+var (
+	artworkCoverFiles       = make(map[string]struct{})
+	supportedCoverMimeTypes = map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+	}
+)
+
+func init() {
+	artworkNames := []string{"cover", "folder", "artwork"}
+
+	for _, ext := range supportedCoverMimeTypes {
+		for _, name := range artworkNames {
+			artworkCoverFiles[name+ext] = struct{}{}
+		}
+	}
+}
 
 // context holds the application state
 type context struct {
@@ -37,6 +56,8 @@ type context struct {
 	inputFiles     []string
 
 	interlaceFilename         *string
+	coverFilename             *string
+	forceCover                bool
 	copyMetadataFromFileIndex *int
 	id3tags                   *string
 	metadataForOutputFile     map[string]string
@@ -60,6 +81,15 @@ func (c *context) StringWithPrefix(p string) string {
 		str.WriteString("!not set")
 	} else {
 		str.WriteString(*c.outputFilename)
+	}
+	str.WriteString("\n")
+
+	str.WriteString(p)
+	str.WriteString(fmt.Sprintf("  - Cover filename (force:%t): ", c.forceCover))
+	if c.coverFilename == nil {
+		str.WriteString("!not set")
+	} else {
+		str.WriteString(*c.coverFilename)
 	}
 	str.WriteString("\n")
 
@@ -140,6 +170,7 @@ func main() {
 	flag.Var(flagext.NewStringPtrFlag(&ctx.outputFilename), "out", "output filepath. Defaults to name of the folder of the first file provided")
 	flag.Var(flagext.NewStringPtrFlag(&ctx.inputDirectory), "dir", "directory of files to merge")
 	flag.Var(flagext.NewStringPtrFlag(&ctx.interlaceFilename), "interlace", "interlace a spacer file (e.g. silence) between each input file")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.coverFilename), "cover", "use image file as artwork")
 	flag.Var(flagext.NewStringPtrFlag(&ctx.id3tags), "tapply", "apply id3v2 tags to output file.\nTakes the format 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
 	flag.Var(flagext.NewIntPtrFlag(&ctx.copyMetadataFromFileIndex), "tcopy", "copy the ID3 metadata tag from the n-th input file, starting with 1")
 
@@ -155,6 +186,7 @@ func main() {
 	p := pipeline{
 		collectFilesFromCommandline,
 		collectFilesFromDirectory,
+		setCoverfile,
 		setInterlaceFile,
 		mustHaveMediaFiles,
 		removePossibleInterlaceFileFromFiles,
@@ -215,7 +247,7 @@ func collectFilesFromDirectory(c *context) error {
 }
 
 func validateInputFile(f string) error {
-	_, err := os.Lstat(f)
+	_, err := os.Stat(f)
 	if err != nil {
 		return fmt.Errorf("given media file '%s' does not exist", f)
 	}
@@ -324,7 +356,7 @@ func setOutputFileName(c *context) error {
 		return fmt.Errorf("can get absolute location of file '%s', %v", *c.outputFilename, err)
 	}
 
-	_, err = os.Lstat(abs)
+	_, err = os.Stat(abs)
 	if err == nil && c.forceOverwrite == false {
 		return fmt.Errorf("file already exists '%s', use force (-f) to overwrite", *c.outputFilename)
 	}
@@ -531,7 +563,7 @@ func collectID3TagsFromCommandline(c *context) error {
 }
 
 func applyMetadata(c *context) error {
-	if c.copyMetadataFromFileIndex == nil && len(c.metadataForOutputFile) == 0 {
+	if c.copyMetadataFromFileIndex == nil && len(c.metadataForOutputFile) == 0 && c.coverFilename == nil {
 		return nil
 	}
 
@@ -550,15 +582,41 @@ func applyMetadata(c *context) error {
 		}
 		defer masterTag.Close()
 
+		// from master file
 		for id := range masterTag.AllFrames() {
 			frames[id] = masterTag.GetLastFrame(id)
 		}
 	}
 
+	// frames from commandline
 	for id, value := range c.metadataForOutputFile {
 		frames[id] = &id3v2.TextFrame{Encoding: tag.DefaultEncoding(), Text: value}
 	}
 
+	if c.coverFilename != nil {
+		_, ok := frames[tagCover]
+		if !ok || c.forceCover {
+			cover, err := ioutil.ReadFile(*c.coverFilename)
+			if err != nil {
+				return fmt.Errorf("can not read cover file '%s', %v", *c.coverFilename, err)
+			}
+
+			pic := id3v2.PictureFrame{
+				Encoding:    id3v2.EncodingUTF8,
+				MimeType:    getMimeFromFilename(*c.coverFilename),
+				PictureType: id3v2.PTFrontCover,
+				Description: "Front cover",
+				Picture:     cover,
+			}
+			tag.AddAttachedPicture(pic)
+		} else {
+			if c.showInformationDuringProcessing {
+				fmt.Println("Info: output file already has a cover file, ignoring magic file")
+			}
+		}
+	}
+
+	// Apply all
 	for id, f := range frames {
 		tag.AddFrame(id, f)
 	}
@@ -567,6 +625,68 @@ func applyMetadata(c *context) error {
 	if err != nil {
 		return fmt.Errorf("can not write id3 tags to tile, %v", err)
 	}
+
+	return nil
+}
+
+func getMimeFromFilename(filename string) string {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".png":
+		return "image/png"
+	case ".jpeg":
+		fallthrough
+	case ".jpg":
+		return "image/jpeg"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func setCoverfile(c *context) error {
+	if c.coverFilename != nil {
+		_, err := os.Stat(*c.coverFilename)
+		if err != nil {
+			return fmt.Errorf("given cover file '%s' does not exist", *c.coverFilename)
+		}
+
+		_, ok := supportedCoverMimeTypes[getMimeFromFilename(*c.coverFilename)]
+		if !ok {
+			return fmt.Errorf("given cover file '%s' is not supported", *c.coverFilename)
+		}
+
+		c.forceCover = true
+	} else if c.inputDirectory != nil {
+		dirContent, err := ioutil.ReadDir(*c.inputDirectory)
+		if err != nil {
+			return fmt.Errorf("can not files from directory, %v", err)
+		}
+		for _, file := range dirContent {
+			if file.IsDir() {
+				continue
+			}
+
+			if _, ok := artworkCoverFiles[strings.ToLower(file.Name())]; ok {
+				file := filepath.Join(*c.inputDirectory, file.Name())
+				if c.showInformationDuringProcessing {
+					fmt.Printf("Info: found magic cover file '%s', applying\n", file)
+				}
+				c.coverFilename = &file
+				break
+			}
+		}
+
+		if c.coverFilename == nil {
+			return nil
+		}
+	}
+
+	abs, err := filepath.Abs(*c.coverFilename)
+	if err != nil {
+		return fmt.Errorf("can not get absolute path for cover file '%s', %v", *c.coverFilename, err)
+	}
+	c.coverFilename = &abs
 
 	return nil
 }
