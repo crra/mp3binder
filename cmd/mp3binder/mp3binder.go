@@ -23,6 +23,7 @@ const (
 	extOfMp3               = ".mp3"
 	magicInterlaceFilename = "_interlace.mp3"
 	tagCover               = "APIC"
+	tagTrack               = "TRCK"
 
 	pairSeparator  = ","
 	valueSeparator = "="
@@ -586,6 +587,8 @@ func applyMetadata(c *context) error {
 		for id := range masterTag.AllFrames() {
 			frames[id] = masterTag.GetLastFrame(id)
 		}
+
+		frames[tagTrack] = &id3v2.TextFrame{Encoding: tag.DefaultEncoding(), Text: "1"}
 	}
 
 	// frames from commandline
