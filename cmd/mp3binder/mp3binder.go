@@ -186,7 +186,7 @@ func main() {
 	p := pipeline{
 		collectFilesFromCommandline,
 		collectFilesFromDirectory,
-		setCoverfile,
+		setCoverFile,
 		setInterlaceFile,
 		mustHaveMediaFiles,
 		removePossibleInterlaceFileFromFiles,
@@ -644,7 +644,7 @@ func getMimeFromFilename(filename string) string {
 	}
 }
 
-func setCoverfile(c *context) error {
+func setCoverFile(c *context) error {
 	if c.coverFilename != nil {
 		_, err := os.Stat(*c.coverFilename)
 		if err != nil {
