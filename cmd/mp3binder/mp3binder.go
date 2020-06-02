@@ -679,10 +679,10 @@ func setCoverFile(c *context) error {
 				break
 			}
 		}
+	}
 
-		if c.coverFilename == nil {
-			return nil
-		}
+	if c.coverFilename == nil {
+		return nil
 	}
 
 	abs, err := filepath.Abs(*c.coverFilename)
