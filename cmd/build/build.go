@@ -47,6 +47,7 @@ var (
 func getLatestGitTag(defaultValue string) string {
 	cmd := exec.Command("git", "describe", "--tags")
 	output, err := cmd.CombinedOutput()
+
 	if err != nil {
 		return defaultValue
 	}
@@ -65,9 +66,11 @@ func isSandboxClean() bool {
 	for _, c := range commands {
 		cmd := exec.Command(c[0], c[1:]...)
 		err := cmd.Start()
+
 		if err != nil {
 			return false
 		}
+
 		err = cmd.Wait()
 		if err != nil {
 			return false
@@ -81,7 +84,7 @@ func getVersion() string {
 	version := getLatestGitTag("untagged")
 
 	if !isSandboxClean() {
-		version = version + "-dirty"
+		version += "-dirty"
 	}
 
 	return version
@@ -92,7 +95,7 @@ func main() {
 	buildProduction := flag.Bool("p", false, "Build for production")
 	flag.Parse()
 
-	buildTargets := []target{}
+	var buildTargets []target
 	if *buildAll {
 		buildTargets = allTargets
 	} else {
@@ -110,9 +113,11 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
+
 	for _, t := range buildTargets {
 		for _, b := range bundles {
 			wg.Add(1)
+
 			go build(
 				&wg,
 				b,
@@ -124,6 +129,7 @@ func main() {
 			)
 		}
 	}
+
 	wg.Wait()
 }
 
@@ -151,7 +157,9 @@ func addFileToZip(zipWriter *zip.Writer, sourcePath, zipPath string) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = io.Copy(writer, fileToZip)
+
 	return err
 }
 
@@ -166,7 +174,7 @@ func build(wg *sync.WaitGroup, b bundle, t target, l *log.Logger, variables map[
 
 	targetName := b.targetName
 	if t.os == "windows" {
-		targetName = targetName + ".exe"
+		targetName += ".exe"
 	}
 
 	outfile := path.Join(outFolder, buildType, t.os, targetName)
@@ -189,22 +197,28 @@ func build(wg *sync.WaitGroup, b bundle, t target, l *log.Logger, variables map[
 
 	args = append(args, b.sourcePath)
 	cmd := exec.Command("go", args...)
+
 	cmd.Env = append(os.Environ(), "GOOS="+t.os, "GOARCH="+t.arch)
 
 	err := cmd.Start()
 	if err != nil {
-		log.Fatalf("Build failed, %v", err)
+		log.Printf("Build failed, %v", err)
+		return
 	}
+
 	err = cmd.Wait()
 	if err != nil {
-		log.Fatalf("Build failed, %v", err)
+		log.Printf("Build failed, %v", err)
+		return
 	}
 
 	if isProductBuild {
 		zipFileName := path.Join(outFolder, buildType, t.os, fmt.Sprintf("%s-%s.zip", t.os, b.targetName))
 		newZipFile, err := os.Create(zipFileName)
+
 		if err != nil {
-			log.Fatalf("Can't create zip file, %v", err)
+			log.Printf("Can't create zip file, %v", err)
+			return
 		}
 		defer newZipFile.Close()
 
@@ -213,7 +227,8 @@ func build(wg *sync.WaitGroup, b bundle, t target, l *log.Logger, variables map[
 
 		err = addFileToZip(zipWriter, outfile, targetName)
 		if err != nil {
-			log.Fatalf("Can't create zip file, %v", err)
+			log.Printf("Can't create zip file, %v", err)
+			return
 		}
 	}
 }

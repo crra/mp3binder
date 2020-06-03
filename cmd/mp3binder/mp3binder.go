@@ -20,10 +20,13 @@ import (
 var version = "unversioned"
 
 const (
-	extOfMp3               = ".mp3"
-	magicInterlaceFilename = "_interlace.mp3"
-	tagCover               = "APIC"
-	tagTrack               = "TRCK"
+	extOfMp3                  = ".mp3"
+	interlaceFilesScaleFactor = 2
+	magicInterlaceFilename    = "_interlace.mp3"
+	keyValuePairSize          = 2
+	tagCover                  = "APIC"
+	tagTrack                  = "TRCK"
+	defaultTrackNumber        = "1"
 
 	pairSeparator  = ","
 	valueSeparator = "="
@@ -72,43 +75,53 @@ func (c *context) String() string {
 
 func (c *context) StringWithPrefix(p string) string {
 	var str strings.Builder
+
 	str.WriteString(p)
 	str.WriteString(" Context {\n")
 
 	// General
 	str.WriteString(p)
 	str.WriteString("  - Output filename: ")
+
 	if c.outputFilename == nil {
 		str.WriteString("!not set")
 	} else {
 		str.WriteString(*c.outputFilename)
 	}
+
 	str.WriteString("\n")
 
 	str.WriteString(p)
 	str.WriteString(fmt.Sprintf("  - Cover filename (force:%t): ", c.forceCover))
+
 	if c.coverFilename == nil {
 		str.WriteString("!not set")
 	} else {
 		str.WriteString(*c.coverFilename)
 	}
+
 	str.WriteString("\n")
 
 	// Files
 	str.WriteString(fmt.Sprintf("%s  - Files: (%d)\n", p, len(c.mediaFiles)))
+
 	for i, f := range c.mediaFiles {
 		str.WriteString(fmt.Sprintf("%s    #%02d %s\n", p, i, f))
 	}
+
 	str.WriteString(p)
 
 	// Metadata
 	str.WriteString(fmt.Sprintf("%s  - Metadata: (%d)\n", p, len(c.metadataForOutputFile)))
+
 	for k, v := range c.metadataForOutputFile {
 		str.WriteString(fmt.Sprintf("%s    #%s %s\n", p, k, v))
 	}
+
 	str.WriteString(p)
 
 	str.WriteString(" }\n")
+
 	return str.String()
 }
 
@@ -141,6 +154,7 @@ func runWithInterceptor(pipeline []pipelineFunc, c *context, interceptor pipelin
 
 func newInterceptor(w io.Writer) pipelineFuncInterceptor {
 	i := 0
+
 	return func(c *context, f pipelineFunc) error {
 		funcName := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
 		fmt.Fprintf(w, "%02d: %s\n", i, funcName)
@@ -148,10 +162,13 @@ func newInterceptor(w io.Writer) pipelineFuncInterceptor {
 		err := f(c)
 		fmt.Fprintf(w, "%v\n", c.StringWithPrefix("<"))
 		fmt.Fprintln(w, "")
+
 		i++
+
 		if err != nil {
 			return err
 		}
+
 		return nil
 	}
 }
@@ -168,18 +185,27 @@ func main() {
 	flagDebug := flag.Bool("d", false, "prints debug information for each processing step")
 
 	// Values
-	flag.Var(flagext.NewStringPtrFlag(&ctx.outputFilename), "out", "output filepath. Defaults to name of the folder of the first file provided")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.inputDirectory), "dir", "directory of files to merge")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.interlaceFilename), "interlace", "interlace a spacer file (e.g. silence) between each input file")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.coverFilename), "cover", "use image file as artwork")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.id3tags), "tapply", "apply id3v2 tags to output file.\nTakes the format 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
-	flag.Var(flagext.NewIntPtrFlag(&ctx.copyMetadataFromFileIndex), "tcopy", "copy the ID3 metadata tag from the n-th input file, starting with 1")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.outputFilename), "out",
+		"output filepath. Defaults to name of the folder of the first file provided")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.inputDirectory), "dir",
+		"directory of files to merge")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.interlaceFilename), "interlace",
+		"interlace a spacer file (e.g. silence) between each input file")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.coverFilename), "cover",
+		"use image file as artwork")
+	flag.Var(flagext.NewStringPtrFlag(&ctx.id3tags), "tapply",
+		"apply id3v2 tags to output file.\n"+
+			"Takes the format 'key1=value,key2=value'.\n"+
+			"Keys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
+	flag.Var(flagext.NewIntPtrFlag(&ctx.copyMetadataFromFileIndex), "tcopy",
+		"copy the ID3 metadata tag from the n-th input file, starting with 1")
 
 	flag.Parse()
+
 	ctx.showInformationDuringProcessing = !*flagQuiet
 	ctx.inputFiles = flag.Args()
 
-	if flagVersion != nil && *flagVersion == true {
+	if flagVersion != nil && *flagVersion {
 		fmt.Println(version)
 		return
 	}
@@ -201,7 +227,7 @@ func main() {
 	}
 
 	var err error
-	if *flagDebug == true {
+	if *flagDebug {
 		err = runWithInterceptor(p, ctx, newInterceptor(os.Stdout))
 	} else {
 		err = run(p, ctx)
@@ -223,6 +249,7 @@ func collectFilesFromDirectory(c *context) error {
 		if err != nil {
 			return fmt.Errorf("can not get absolute path for directory '%s', %v", *c.inputDirectory, err)
 		}
+
 		c.inputDirectory = &abs
 	}
 
@@ -232,8 +259,9 @@ func collectFilesFromDirectory(c *context) error {
 	if err != nil {
 		return fmt.Errorf("can not read media files from directory, %v", err)
 	}
+
 	for _, file := range dirContent {
-		if !file.IsDir() && strings.ToLower(filepath.Ext(file.Name())) == extOfMp3 {
+		if !file.IsDir() && strings.EqualFold(extOfMp3, filepath.Ext(file.Name())) {
 			files = append(files, filepath.Join(*c.inputDirectory, file.Name()))
 		}
 	}
@@ -297,7 +325,10 @@ func setInterlaceFile(c *context) error {
 				if c.showInformationDuringProcessing {
 					fmt.Printf("Info: found magic interlace file '%s', applying\n", f)
 				}
-				c.interlaceFilename = &f
+
+				file := f
+				c.interlaceFilename = &file
+
 				break
 			}
 		}
@@ -327,10 +358,9 @@ func interlaceFiles(c *context) error {
 		return nil
 	}
 
-	interlaced := make([]string, 0, len(c.mediaFiles)*2)
+	interlaced := make([]string, 0, len(c.mediaFiles)*interlaceFilesScaleFactor)
 	for _, f := range c.mediaFiles {
-		interlaced = append(interlaced, f)
-		interlaced = append(interlaced, *c.interlaceFilename)
+		interlaced = append(interlaced, f, *c.interlaceFilename)
 	}
 
 	c.mediaFiles = interlaced[:len(interlaced)-1]
@@ -358,7 +388,7 @@ func setOutputFileName(c *context) error {
 	}
 
 	_, err = os.Stat(abs)
-	if err == nil && c.forceOverwrite == false {
+	if err == nil && !c.forceOverwrite {
 		return fmt.Errorf("file already exists '%s', use force (-f) to overwrite", *c.outputFilename)
 	}
 
@@ -376,6 +406,7 @@ func removePossibleInterlaceFileFromFiles(c *context) error {
 	if ok {
 		c.mediaFiles = files
 	}
+
 	return nil
 }
 
@@ -384,6 +415,7 @@ func removePossibleOutputFileFromFiles(c *context) error {
 	if ok {
 		c.mediaFiles = files
 	}
+
 	return nil
 }
 
@@ -396,6 +428,7 @@ func removeStringFromList(list []string, entry string) ([]string, bool) {
 		if e == entry {
 			continue
 		}
+
 		newList = append(newList, e)
 	}
 
@@ -407,17 +440,21 @@ func bindFiles(c *context) error {
 	if err != nil {
 		return fmt.Errorf("can not open output file to write to, %v", err)
 	}
+
 	outFileCloser := ioext.OnceCloser(outFile)
 	defer outFileCloser.Close()
 
 	bitrates := make(map[int]struct{})
-	var framesCount uint32
-	var bytesCount uint32
+
+	var (
+		framesCount uint32
+		bytesCount  uint32
+	)
 
 	for _, file := range c.mediaFiles {
-		inFile, err := os.Open(file)
-		if err != nil {
-			return fmt.Errorf("can not open media file for reading, %v", err)
+		inFile, err1 := os.Open(file)
+		if err1 != nil {
+			return fmt.Errorf("can not open media file for reading, %v", err1)
 		}
 		defer inFile.Close()
 
@@ -434,16 +471,19 @@ func bindFiles(c *context) error {
 
 			bitrates[frame.BitRate] = struct{}{}
 
-			_, err := outFile.Write(frame.RawBytes)
-			if err != nil {
-				return fmt.Errorf("can not write media file content to new file, %v", err)
+			_, err2 := outFile.Write(frame.RawBytes)
+			if err2 != nil {
+				return fmt.Errorf("can not write media file content to new file, %v", err2)
 			}
+
 			framesCount++
+
 			bytesCount += uint32(len(frame.RawBytes))
 		}
 	}
 
-	outFileCloser.Close()
+	err = outFileCloser.Close()
+
 	if err != nil {
 		return fmt.Errorf("error closing new file, %v", err)
 	}
@@ -462,8 +502,9 @@ func bindFiles(c *context) error {
 func addXingHeader(file string, totalFrames, totalBytes uint32) error {
 	shell, err := ioutil.TempFile(filepath.Dir(file), "*")
 	if err != nil {
-		return fmt.Errorf("can not create temporay file, %v", err)
+		return fmt.Errorf("can not create temporary file, %v", err)
 	}
+
 	shellCloser := ioext.OnceCloser(shell)
 	defer shellCloser.Close()
 
@@ -479,6 +520,7 @@ func addXingHeader(file string, totalFrames, totalBytes uint32) error {
 	if err != nil {
 		return fmt.Errorf("can not open media file for reading, %v", err)
 	}
+
 	inputFileCloser := ioext.OnceCloser(inputFile)
 	defer inputFileCloser.Close()
 
@@ -491,6 +533,7 @@ func addXingHeader(file string, totalFrames, totalBytes uint32) error {
 	if err != nil {
 		return fmt.Errorf("can not close temporary file, %v", err)
 	}
+
 	err = inputFileCloser.Close()
 	if err != nil {
 		return fmt.Errorf("can not close media file, %v", err)
@@ -513,6 +556,7 @@ func setMetadataCopyIndex(c *context) error {
 	if *c.copyMetadataFromFileIndex == 0 {
 		// assume the user wanted the first file
 		indexZeroBased = 0
+
 		if c.showInformationDuringProcessing {
 			fmt.Println("info: file index '0' for copying metadata was specified, using first file")
 		}
@@ -540,10 +584,11 @@ func collectID3TagsFromCommandline(c *context) error {
 	// Very simple "key1=value1,key2=value2" parser
 	for _, meta := range strings.Split(*c.id3tags, pairSeparator) {
 		pairs := strings.Split(meta, valueSeparator)
-		if len(pairs) != 2 {
+		if len(pairs) != keyValuePairSize {
 			if c.showInformationDuringProcessing {
 				fmt.Printf("Warning: tag definition '%s' is not in the form key%svalue, ignoring\n", meta, valueSeparator)
 			}
+
 			continue
 		}
 
@@ -554,6 +599,7 @@ func collectID3TagsFromCommandline(c *context) error {
 			if c.showInformationDuringProcessing {
 				fmt.Printf("Warning: tag '%s' is not a well-known tag, ignoring\n", tag)
 			}
+
 			continue
 		}
 
@@ -561,6 +607,24 @@ func collectID3TagsFromCommandline(c *context) error {
 	}
 
 	return nil
+}
+
+func getID3FramesFromFile(file string) (map[string]id3v2.Framer, error) {
+	frames := make(map[string]id3v2.Framer)
+
+	masterTag, err1 := id3v2.Open(file, id3v2.Options{Parse: true})
+	if err1 != nil {
+		return nil, fmt.Errorf("can not read id3 information from media file, %v", err1)
+	}
+	defer masterTag.Close()
+
+	for id := range masterTag.AllFrames() {
+		frames[id] = masterTag.GetLastFrame(id)
+	}
+
+	frames[tagTrack] = &id3v2.TextFrame{Encoding: masterTag.DefaultEncoding(), Text: defaultTrackNumber}
+
+	return frames, nil
 }
 
 func applyMetadata(c *context) error {
@@ -576,19 +640,12 @@ func applyMetadata(c *context) error {
 
 	frames := make(map[string]id3v2.Framer)
 
+	// Frames from file
 	if c.copyMetadataFromFileIndex != nil {
-		masterTag, err := id3v2.Open(c.mediaFiles[*c.copyMetadataFromFileIndex], id3v2.Options{Parse: true})
+		frames, err = getID3FramesFromFile(c.mediaFiles[*c.copyMetadataFromFileIndex])
 		if err != nil {
-			return fmt.Errorf("can not read id3 information from media file, %v", err)
+			return err
 		}
-		defer masterTag.Close()
-
-		// from master file
-		for id := range masterTag.AllFrames() {
-			frames[id] = masterTag.GetLastFrame(id)
-		}
-
-		frames[tagTrack] = &id3v2.TextFrame{Encoding: tag.DefaultEncoding(), Text: "1"}
 	}
 
 	// frames from commandline
@@ -599,9 +656,9 @@ func applyMetadata(c *context) error {
 	if c.coverFilename != nil {
 		_, ok := frames[tagCover]
 		if !ok || c.forceCover {
-			cover, err := ioutil.ReadFile(*c.coverFilename)
-			if err != nil {
-				return fmt.Errorf("can not read cover file '%s', %v", *c.coverFilename, err)
+			cover, err2 := ioutil.ReadFile(*c.coverFilename)
+			if err2 != nil {
+				return fmt.Errorf("can not read cover file '%s', %v", *c.coverFilename, err2)
 			}
 
 			pic := id3v2.PictureFrame{
@@ -612,10 +669,8 @@ func applyMetadata(c *context) error {
 				Picture:     cover,
 			}
 			tag.AddAttachedPicture(pic)
-		} else {
-			if c.showInformationDuringProcessing {
-				fmt.Println("Info: output file already has a cover file, ignoring magic file")
-			}
+		} else if c.showInformationDuringProcessing {
+			fmt.Println("Info: output file already has a cover file, ignoring magic file")
 		}
 	}
 
@@ -638,9 +693,7 @@ func getMimeFromFilename(filename string) string {
 		return "audio/mpeg"
 	case ".png":
 		return "image/png"
-	case ".jpeg":
-		fallthrough
-	case ".jpg":
+	case ".jpg", ".jpeg":
 		return "image/jpeg"
 	default:
 		return "application/octet-stream"
@@ -689,6 +742,7 @@ func setCoverFile(c *context) error {
 	if err != nil {
 		return fmt.Errorf("can not get absolute path for cover file '%s', %v", *c.coverFilename, err)
 	}
+
 	c.coverFilename = &abs
 
 	return nil

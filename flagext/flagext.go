@@ -23,6 +23,7 @@ func (f IntPtrFlag) String() string {
 	if f.ptr == nil || *f.ptr == nil {
 		return ""
 	}
+
 	return strconv.Itoa(**f.ptr)
 }
 
@@ -34,6 +35,7 @@ func (f IntPtrFlag) Set(s string) error {
 	}
 
 	*f.ptr = &v
+
 	return nil
 }
 
@@ -53,6 +55,7 @@ func (f StringPtrFlag) String() string {
 	if f.ptr == nil || *f.ptr == nil {
 		return ""
 	}
+
 	return **f.ptr
 }
 
