@@ -1,6 +1,7 @@
 package flagext
 
 import (
+	"flag"
 	"fmt"
 	"strconv"
 )
@@ -63,4 +64,11 @@ func (f StringPtrFlag) String() string {
 func (f StringPtrFlag) Set(s string) error {
 	*f.ptr = &s
 	return nil
+}
+
+func StringPtr(flagSet *flag.FlagSet, name, usage string) *string {
+	s := new(string)
+	flag.Var(NewStringPtrFlag(&s), name, usage)
+
+	return s
 }

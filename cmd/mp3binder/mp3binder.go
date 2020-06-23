@@ -4,32 +4,24 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
-	"runtime"
 	"strings"
 
 	"github.com/bogem/id3v2"
 	"github.com/crra/mp3binder/flagext"
-	"github.com/crra/mp3binder/ioext"
-	"github.com/dmulholl/mp3lib"
 )
 
-var version = "unversioned"
+var version = "development"
 
 const (
 	extOfMp3                  = ".mp3"
 	interlaceFilesScaleFactor = 2
-	magicInterlaceFilename    = "_interlace.mp3"
-	keyValuePairSize          = 2
-	tagCover                  = "APIC"
-	tagTrack                  = "TRCK"
-	defaultTrackNumber        = "1"
+	magicInterlaceFileName    = "_interlace.mp3"
 
-	pairSeparator  = ","
-	valueSeparator = "="
+	keyValuePairSize = 2
+	pairSeparator    = ","
+	valueSeparator   = "="
 )
 
 var (
@@ -50,645 +42,358 @@ func init() {
 	}
 }
 
-// context holds the application state
-type context struct {
-	showInformationDuringProcessing bool
-	forceOverwrite                  bool
-	outputFilename                  *string
+func stringToPtr(in string) *string { return &in }
+func IntToPtr(in int) *int          { return &in }
 
-	inputDirectory *string
-	inputFiles     []string
+type fileStatFn func(string) (os.FileInfo, error)
+type dirReaderFn func(string) ([]os.FileInfo, error)
+type absFn func(string) (string, error)
 
-	interlaceFilename         *string
-	coverFilename             *string
-	forceCover                bool
-	copyMetadataFromFileIndex *int
-	id3tags                   *string
-	metadataForOutputFile     map[string]string
-
-	mediaFiles []string
+type fileSystemAbstraction interface {
+	Stat(name string) (os.FileInfo, error)
+	ReadDir(dirname string) ([]os.FileInfo, error)
+	Abs(path string) (string, error)
 }
 
-func (c *context) String() string {
-	return c.StringWithPrefix("")
-}
+func newUserInput(arguments []string, output io.Writer, errorHandling flag.ErrorHandling) (*userInput, error) {
+	input := &userInput{}
 
-func (c *context) StringWithPrefix(p string) string {
-	var str strings.Builder
+	fs := flag.NewFlagSet(arguments[0], errorHandling)
+	fs.SetOutput(output)
 
-	str.WriteString(p)
-	str.WriteString(" Context {\n")
+	fs.BoolVar(&input.showVersion, "version", false, "show version info")
+	fs.BoolVar(&input.forceOverwrite, "f", false, "overwrite an existing output file")
+	quiet := fs.Bool("q", false, "suppress info and warnings")
+	noAuto := fs.Bool("noauto", false, "disable auto discovering of magic files")
 
-	// General
-	str.WriteString(p)
-	str.WriteString("  - Output filename: ")
-
-	if c.outputFilename == nil {
-		str.WriteString("!not set")
-	} else {
-		str.WriteString(*c.outputFilename)
-	}
-
-	str.WriteString("\n")
-
-	str.WriteString(p)
-	str.WriteString(fmt.Sprintf("  - Cover filename (force:%t): ", c.forceCover))
-
-	if c.coverFilename == nil {
-		str.WriteString("!not set")
-	} else {
-		str.WriteString(*c.coverFilename)
-	}
-
-	str.WriteString("\n")
-
-	// Files
-	str.WriteString(fmt.Sprintf("%s  - Files: (%d)\n", p, len(c.mediaFiles)))
-
-	for i, f := range c.mediaFiles {
-		str.WriteString(fmt.Sprintf("%s    #%02d %s\n", p, i, f))
-	}
-
-	str.WriteString(p)
-
-	// Metadata
-	str.WriteString(fmt.Sprintf("%s  - Metadata: (%d)\n", p, len(c.metadataForOutputFile)))
-
-	for k, v := range c.metadataForOutputFile {
-		str.WriteString(fmt.Sprintf("%s    #%s %s\n", p, k, v))
-	}
-
-	str.WriteString(p)
-
-	str.WriteString(" }\n")
-
-	return str.String()
-}
-
-// "railway-oriented programming" looks a lot like a chain of middlewares or httpHandlerFuncs
-type pipelineFunc func(*context) error
-type pipelineFuncInterceptor func(*context, pipelineFunc) error
-type pipeline []pipelineFunc
-
-func run(pipeline []pipelineFunc, c *context) error {
-	for _, f := range pipeline {
-		err := f(c)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func runWithInterceptor(pipeline []pipelineFunc, c *context, interceptor pipelineFuncInterceptor) error {
-	for _, f := range pipeline {
-		err := interceptor(c, f)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func newInterceptor(w io.Writer) pipelineFuncInterceptor {
-	i := 0
-
-	return func(c *context, f pipelineFunc) error {
-		funcName := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
-		fmt.Fprintf(w, "%02d: %s\n", i, funcName)
-		fmt.Printf("%v\n", c.StringWithPrefix(">"))
-		err := f(c)
-		fmt.Fprintf(w, "%v\n", c.StringWithPrefix("<"))
-		fmt.Fprintln(w, "")
-
-		i++
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-}
-
-func main() {
-	ctx := &context{
-		metadataForOutputFile: make(map[string]string),
-	}
-
-	// Flags
-	flagVersion := flag.Bool("v", false, "show version info")
-	flag.BoolVar(&ctx.forceOverwrite, "f", false, "overwrite an existing output file")
-	flagQuiet := flag.Bool("q", false, "suppress info and warnings")
-	flagDebug := flag.Bool("d", false, "prints debug information for each processing step")
-
-	// Values
-	flag.Var(flagext.NewStringPtrFlag(&ctx.outputFilename), "out",
+	fs.Var(flagext.NewStringPtrFlag(&input.outputFileName), "out",
 		"output filepath. Defaults to name of the folder of the first file provided")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.inputDirectory), "dir",
-		"directory of files to merge")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.interlaceFilename), "interlace",
+	fs.Var(flagext.NewStringPtrFlag(&input.inputDirectory), "dir", "directory of files to merge")
+
+	fs.Var(flagext.NewStringPtrFlag(&input.interlaceFileName), "interlace",
 		"interlace a spacer file (e.g. silence) between each input file")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.coverFilename), "cover",
-		"use image file as artwork")
-	flag.Var(flagext.NewStringPtrFlag(&ctx.id3tags), "tapply",
+	fs.Var(flagext.NewStringPtrFlag(&input.coverFileName), "cover", "use image file as artwork")
+	fs.Var(flagext.NewIntPtrFlag(&input.copyMetadataFromFileIndex), "tcopy",
+		"copy the ID3 metadata tag from the n-th input file, starting with 1")
+	fs.Var(flagext.NewStringPtrFlag(&input.tags), "tapply",
 		"apply id3v2 tags to output file.\n"+
 			"Takes the format 'key1=value,key2=value'.\n"+
 			"Keys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
-	flag.Var(flagext.NewIntPtrFlag(&ctx.copyMetadataFromFileIndex), "tcopy",
-		"copy the ID3 metadata tag from the n-th input file, starting with 1")
 
-	flag.Parse()
-
-	ctx.showInformationDuringProcessing = !*flagQuiet
-	ctx.inputFiles = flag.Args()
-
-	if flagVersion != nil && *flagVersion {
-		fmt.Println(version)
-		return
+	if err := fs.Parse(arguments[1:]); err != nil {
+		return nil, err
 	}
 
-	p := pipeline{
-		collectFilesFromCommandline,
-		collectFilesFromDirectory,
-		setCoverFile,
-		setInterlaceFile,
-		mustHaveMediaFiles,
-		removePossibleInterlaceFileFromFiles,
-		setOutputFileName,
-		removePossibleOutputFileFromFiles,
-		interlaceFiles,
-		bindFiles,
-		setMetadataCopyIndex,
-		collectID3TagsFromCommandline,
-		applyMetadata,
-	}
+	input.commandLineArguments = fs.Args()
+	input.discoverMagicFiles = !*noAuto
+	input.printInformation = !*quiet
 
-	var err error
-	if *flagDebug {
-		err = runWithInterceptor(p, ctx, newInterceptor(os.Stdout))
-	} else {
-		err = run(p, ctx)
-	}
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	return input, nil
 }
 
-func collectFilesFromDirectory(c *context) error {
-	if c.inputDirectory == nil {
-		return nil
-	}
+type userInput struct {
+	showVersion        bool
+	printInformation   bool
+	forceOverwrite     bool
+	discoverMagicFiles bool
 
-	if !filepath.IsAbs(*c.inputDirectory) {
-		abs, err := filepath.Abs(*c.inputDirectory)
-		if err != nil {
-			return fmt.Errorf("can not get absolute path for directory '%s', %v", *c.inputDirectory, err)
-		}
-
-		c.inputDirectory = &abs
-	}
-
-	files := []string{}
-
-	dirContent, err := ioutil.ReadDir(*c.inputDirectory)
-	if err != nil {
-		return fmt.Errorf("can not read media files from directory, %v", err)
-	}
-
-	for _, file := range dirContent {
-		if !file.IsDir() && strings.EqualFold(extOfMp3, filepath.Ext(file.Name())) {
-			files = append(files, filepath.Join(*c.inputDirectory, file.Name()))
-		}
-	}
-
-	if len(files) == 0 && c.showInformationDuringProcessing {
-		fmt.Println("Warning: input directory contains no media files")
-	}
-
-	c.mediaFiles = append(c.mediaFiles, files...)
-
-	return nil
+	commandLineArguments      []string
+	inputDirectory            *string
+	interlaceFileName         *string
+	outputFileName            *string
+	coverFileName             *string
+	copyMetadataFromFileIndex *int
+	tags                      *string
 }
 
-func validateInputFile(f string) error {
-	_, err := os.Stat(f)
-	if err != nil {
-		return fmt.Errorf("given media file '%s' does not exist", f)
-	}
-
-	ext := strings.ToLower(filepath.Ext(f))
-	if ext != extOfMp3 {
-		return fmt.Errorf("given media file '%s' is not a media file", f)
-	}
-
-	return nil
+type job struct {
+	files           []string
+	outputFileName  string
+	coverFileName   *string
+	tagTemplateFile *string
+	tags            map[string]string
 }
 
-func collectFilesFromCommandline(c *context) error {
-	for _, f := range c.inputFiles {
-		file, err := filepath.Abs(f)
-		if err != nil {
-			return fmt.Errorf("can get absolute location of file '%s', %v", f, err)
-		}
-
-		err = validateInputFile(file)
-		if err != nil {
-			return err
-		}
-
-		c.mediaFiles = append(c.mediaFiles, file)
-	}
-
-	return nil
-}
-
-func mustHaveMediaFiles(c *context) error {
-	if len(c.mediaFiles) == 0 {
-		return fmt.Errorf("no media files for processing available")
-	} else if len(c.mediaFiles) == 1 {
-		return fmt.Errorf("only one media file for processing available")
-	}
-
-	return nil
-}
-
-func setInterlaceFile(c *context) error {
-	if c.interlaceFilename == nil {
-		for _, f := range c.mediaFiles {
-			name := filepath.Base(f)
-			if name == magicInterlaceFilename {
-				if c.showInformationDuringProcessing {
-					fmt.Printf("Info: found magic interlace file '%s', applying\n", f)
-				}
-
-				file := f
-				c.interlaceFilename = &file
-
-				break
-			}
-		}
-
-		if c.interlaceFilename == nil {
-			return nil
-		}
-	}
-
-	interlaceFilename, err := filepath.Abs(*c.interlaceFilename)
-	if err != nil {
-		return fmt.Errorf("can not get absolute location of file '%s', %v", interlaceFilename, err)
-	}
-
-	err = validateInputFile(interlaceFilename)
-	if err != nil {
-		return err
-	}
-
-	c.interlaceFilename = &interlaceFilename
-
-	return nil
-}
-
-func interlaceFiles(c *context) error {
-	if c.interlaceFilename == nil {
-		return nil
-	}
-
-	interlaced := make([]string, 0, len(c.mediaFiles)*interlaceFilesScaleFactor)
-	for _, f := range c.mediaFiles {
-		interlaced = append(interlaced, f, *c.interlaceFilename)
-	}
-
-	c.mediaFiles = interlaced[:len(interlaced)-1]
-
-	return nil
-}
-
-func setOutputFileName(c *context) error {
-	var outputFilename string
-
-	if c.outputFilename == nil {
-		if len(c.mediaFiles) == 0 {
-			return fmt.Errorf("output filename not set and no files provided that could be used to deduce filename")
-		}
-
-		pathOfFirstFile := filepath.Dir(c.mediaFiles[0])
-		nameOfFolder := filepath.Base(pathOfFirstFile)
-		outputFilename = filepath.Join(pathOfFirstFile, nameOfFolder+extOfMp3)
-		c.outputFilename = &outputFilename
-	}
-
-	abs, err := filepath.Abs(*c.outputFilename)
-	if err != nil {
-		return fmt.Errorf("can get absolute location of file '%s', %v", *c.outputFilename, err)
-	}
-
-	_, err = os.Stat(abs)
-	if err == nil && !c.forceOverwrite {
-		return fmt.Errorf("file already exists '%s', use force (-f) to overwrite", *c.outputFilename)
-	}
-
-	c.outputFilename = &abs
-
-	return nil
-}
-
-func removePossibleInterlaceFileFromFiles(c *context) error {
-	if c.interlaceFilename == nil {
-		return nil
-	}
-
-	files, ok := removeStringFromList(c.mediaFiles, *c.interlaceFilename)
-	if ok {
-		c.mediaFiles = files
-	}
-
-	return nil
-}
-
-func removePossibleOutputFileFromFiles(c *context) error {
-	files, ok := removeStringFromList(c.mediaFiles, *c.outputFilename)
-	if ok {
-		c.mediaFiles = files
-	}
-
-	return nil
-}
-
-func removeStringFromList(list []string, entry string) ([]string, bool) {
-	newList := make([]string, 0, len(list))
-
-	// There is no 'filter' in golang: https://github.com/robpike/filter
-	// and no generics in go1
-	for _, e := range list {
-		if e == entry {
-			continue
-		}
-
-		newList = append(newList, e)
-	}
-
-	return newList, len(list) != len(newList)
-}
-
-func bindFiles(c *context) error {
-	outFile, err := os.Create(*c.outputFilename)
-	if err != nil {
-		return fmt.Errorf("can not open output file to write to, %v", err)
-	}
-
-	outFileCloser := ioext.OnceCloser(outFile)
-	defer outFileCloser.Close()
-
-	bitrates := make(map[int]struct{})
-
+func newJobFromInput(fs fileSystemAbstraction, input *userInput, infoWriter io.Writer) (*job, error) {
 	var (
-		framesCount uint32
-		bytesCount  uint32
+		err               error
+		commandLineFiles  []string
+		directoryFiles    []string
+		files             []string
+		outputFileName    string
+		coverFileName     *string
+		interlaceFileName *string
+		tagTemplateFile   *string
+		tags              map[string]string
+		filter            = func(file os.FileInfo) bool {
+			return !file.IsDir() && strings.EqualFold(extOfMp3, filepath.Ext(file.Name()))
+		}
 	)
 
-	for _, file := range c.mediaFiles {
-		inFile, err1 := os.Open(file)
-		if err1 != nil {
-			return fmt.Errorf("can not open media file for reading, %v", err1)
-		}
-		defer inFile.Close()
+	if input == nil {
+		return nil, fmt.Errorf("no input specified")
+	}
 
-		for i := 0; true; i++ {
-			frame := mp3lib.NextFrame(inFile)
-			if frame == nil {
+	if commandLineFiles, err = fileListReader(fs, input.commandLineArguments, filter); err != nil {
+		return nil, err
+	}
+
+	if input.inputDirectory != nil {
+		var inputDirectoryAbs string
+
+		if inputDirectoryAbs, err = fs.Abs(*input.inputDirectory); err != nil {
+			return nil, fmt.Errorf("can not get absolute location of file '%s', %v", *input.inputDirectory, err)
+		}
+
+		input.inputDirectory = &inputDirectoryAbs
+
+		if directoryFiles, err = directoryReader(fs, *input.inputDirectory, filter, false); err != nil {
+			return nil, err
+		}
+	}
+
+	files = commandLineFiles
+	files = append(files, directoryFiles...)
+
+	if err1 := ensureProcessableFiles(len(files)); err1 != nil {
+		return nil, err1
+	}
+
+	if outputFileName, err = getOutputFileName(
+		fs, infoWriter, input.outputFileName, input.forceOverwrite, input.inputDirectory, files); err != nil {
+		return nil, err
+	}
+
+	if coverFileName, err = getCoverFileName(fs, infoWriter, input.coverFileName,
+		input.discoverMagicFiles, input.inputDirectory); err != nil {
+		return nil, err
+	}
+
+	if interlaceFileName, err = getInterlaceFileName(
+		fs, infoWriter, input.interlaceFileName, filter, input.discoverMagicFiles, files); err != nil {
+		return nil, err
+	}
+
+	specialFiles := []string{outputFileName}
+	if interlaceFileName != nil {
+		specialFiles = append(specialFiles, *interlaceFileName)
+	}
+
+	files = removeElementsFromStringList(files, specialFiles)
+
+	if err1 := ensureProcessableFiles(len(files)); err1 != nil {
+		return nil, err1
+	}
+
+	if input.copyMetadataFromFileIndex != nil {
+		if tagTemplateFile, err = getElementByIndex(infoWriter, files, *input.copyMetadataFromFileIndex); err != nil {
+			return nil, err
+		}
+	}
+
+	if interlaceFileName != nil {
+		files = addInterlaceToStringList(files, *interlaceFileName)
+	}
+
+	if input.tags != nil {
+		tags = kvStringToTagMap(infoWriter, *input.tags)
+	}
+
+	return &job{
+		files:           files,
+		outputFileName:  outputFileName,
+		coverFileName:   coverFileName,
+		tagTemplateFile: tagTemplateFile,
+		tags:            tags,
+	}, nil
+}
+
+type fileInfoFilterFn func(info os.FileInfo) bool
+
+func fileListReader(fs fileSystemAbstraction, files []string, filter fileInfoFilterFn) ([]string, error) {
+	for i, file := range files {
+		if !filepath.IsAbs(file) {
+			var err error
+
+			if file, err = fs.Abs(file); err != nil {
+				return []string{}, fmt.Errorf("can not get absolute path for file '%s', %v", file, err)
+			}
+
+			files[i] = file
+		}
+
+		var (
+			info os.FileInfo
+			err  error
+		)
+
+		if info, err = fs.Stat(file); err != nil {
+			return []string{}, fmt.Errorf("given media file '%s' does not exist", file)
+		}
+
+		if !filter(info) {
+			return []string{}, fmt.Errorf("given media file '%s' is not a media file", file)
+		}
+	}
+
+	return files, nil
+}
+
+func directoryReader(
+	fs fileSystemAbstraction,
+	directory string,
+	filter fileInfoFilterFn,
+	first bool,
+) ([]string, error) {
+	var err error
+
+	if !filepath.IsAbs(directory) {
+		directory, err = fs.Abs(directory)
+		if err != nil {
+			return []string{}, fmt.Errorf("can not get absolute path for directory '%s', %v", directory, err)
+		}
+	}
+
+	fstat, err := fs.Stat(directory)
+	if err != nil {
+		return []string{}, fmt.Errorf("directory does not exists '%s'", directory)
+	} else if !fstat.IsDir() {
+		return []string{}, fmt.Errorf("provided path for '-dir' is not a directory '%s'", directory)
+	}
+
+	dirContent, err := fs.ReadDir(directory)
+	if err != nil {
+		return []string{}, fmt.Errorf("can not read media files from directory, %v", err)
+	}
+
+	index := 0
+	files := make([]string, len(dirContent))
+
+	for _, info := range dirContent {
+		if filter(info) {
+			files[index] = filepath.Join(directory, info.Name())
+			index++
+
+			if first {
 				break
 			}
-
-			// Skip the first frame if it's a VBR header.
-			if i == 0 && (mp3lib.IsXingHeader(frame) || mp3lib.IsVbriHeader(frame)) {
-				continue
-			}
-
-			bitrates[frame.BitRate] = struct{}{}
-
-			_, err2 := outFile.Write(frame.RawBytes)
-			if err2 != nil {
-				return fmt.Errorf("can not write media file content to new file, %v", err2)
-			}
-
-			framesCount++
-
-			bytesCount += uint32(len(frame.RawBytes))
 		}
 	}
 
-	err = outFileCloser.Close()
+	return files[:index], nil
+}
 
-	if err != nil {
-		return fmt.Errorf("error closing new file, %v", err)
+// getOutputFileName determines the file name of the for the output file
+// either the name is explicitly set or the name is derived from the
+// input directory or from the first file provided via the command line
+func getOutputFileName(
+	fs fileSystemAbstraction,
+	output io.Writer,
+	outputFileName *string,
+	forceOverwrite bool,
+	inputDirectory *string,
+	files []string,
+) (string, error) {
+	if outputFileName == nil {
+		var fileName string
+
+		if inputDirectory != nil {
+			nameOfFolder := filepath.Base(*inputDirectory)
+			fileName = filepath.Join(*inputDirectory, nameOfFolder+extOfMp3)
+		} else {
+			if len(files) < 1 {
+				return "", fmt.Errorf("can not determine output file from input, please specify with the '-out' option")
+			}
+			pathFromFirstFile := filepath.Dir(files[0])
+			nameOfFolder := filepath.Base(pathFromFirstFile)
+			fileName = filepath.Join(pathFromFirstFile, nameOfFolder+extOfMp3)
+		}
+
+		outputFileName = &fileName
 	}
 
-	// VBR header
-	if len(bitrates) != 1 {
-		err := addXingHeader(*c.outputFilename, framesCount, bytesCount)
+	absOutputFileName, err := fs.Abs(*outputFileName)
+	if err != nil {
+		return "", fmt.Errorf("can not get absolute location of file '%s', %v", *outputFileName, err)
+	}
+
+	_, err = fs.Stat(absOutputFileName)
+	if err == nil {
+		if forceOverwrite {
+			fmt.Fprintf(output, "Info: overwriting file '%s'\n", *outputFileName)
+		} else {
+			return "", fmt.Errorf("file already exists '%s', use force (-f) to overwrite", *outputFileName)
+		}
+	}
+
+	return absOutputFileName, nil
+}
+
+func ensureProcessableFiles(length int) error {
+	switch length {
+	case 0:
+		return fmt.Errorf("no media files for processing available")
+	case 1:
+		return fmt.Errorf("only one media file for processing available")
+	default:
+		return nil
+	}
+}
+
+func getCoverFileName(
+	fs fileSystemAbstraction,
+	output io.Writer,
+	coverFileName *string,
+	discoverMagicFiles bool,
+	inputDirectory *string) (*string, error) {
+	if coverFileName != nil {
+		_, err := fs.Stat(*coverFileName)
 		if err != nil {
-			return fmt.Errorf("can not update vbr header in output file, %v", err)
+			return nil, fmt.Errorf("given cover file '%s' does not exist", *coverFileName)
 		}
-	}
 
-	return nil
-}
-
-func addXingHeader(file string, totalFrames, totalBytes uint32) error {
-	shell, err := ioutil.TempFile(filepath.Dir(file), "*")
-	if err != nil {
-		return fmt.Errorf("can not create temporary file, %v", err)
-	}
-
-	shellCloser := ioext.OnceCloser(shell)
-	defer shellCloser.Close()
-
-	xingHeader := mp3lib.NewXingHeader(totalFrames, totalBytes)
-
-	// header + content
-	_, err = shell.Write(xingHeader.RawBytes)
-	if err != nil {
-		return fmt.Errorf("can not write to temporary file, %v", err)
-	}
-
-	inputFile, err := os.Open(file)
-	if err != nil {
-		return fmt.Errorf("can not open media file for reading, %v", err)
-	}
-
-	inputFileCloser := ioext.OnceCloser(inputFile)
-	defer inputFileCloser.Close()
-
-	_, err = io.Copy(shell, inputFile)
-	if err != nil {
-		return fmt.Errorf("can not open file for writing, %v", err)
-	}
-
-	err = shellCloser.Close()
-	if err != nil {
-		return fmt.Errorf("can not close temporary file, %v", err)
-	}
-
-	err = inputFileCloser.Close()
-	if err != nil {
-		return fmt.Errorf("can not close media file, %v", err)
-	}
-
-	err = os.Rename(shell.Name(), file)
-	if err != nil {
-		return fmt.Errorf("can not replace media file with temporary file, %v", err)
-	}
-
-	return nil
-}
-
-func setMetadataCopyIndex(c *context) error {
-	if c.copyMetadataFromFileIndex == nil {
-		return nil
-	}
-
-	indexZeroBased := *c.copyMetadataFromFileIndex - 1
-	if *c.copyMetadataFromFileIndex == 0 {
-		// assume the user wanted the first file
-		indexZeroBased = 0
-
-		if c.showInformationDuringProcessing {
-			fmt.Println("info: file index '0' for copying metadata was specified, using first file")
+		_, ok := supportedCoverMimeTypes[getMimeFromFileName(*coverFileName)]
+		if !ok {
+			return nil, fmt.Errorf("given cover file '%s' is not supported", *coverFileName)
 		}
-	} else if indexZeroBased < 0 || indexZeroBased >= len(c.mediaFiles) {
-		return fmt.Errorf("file index '%d' for copying metadata is greater than the available files", indexZeroBased+1)
-	}
-
-	c.copyMetadataFromFileIndex = &indexZeroBased
-
-	return nil
-}
-
-func collectID3TagsFromCommandline(c *context) error {
-	if c.id3tags == nil {
-		return nil
-	}
-
-	// Set of known tags that is used to warn the caller if the tag specified
-	// is not well-known
-	knownTags := make(map[string]bool, len(id3v2.V23CommonIDs))
-	for _, tagName := range id3v2.V23CommonIDs {
-		knownTags[tagName] = true
-	}
-
-	// Very simple "key1=value1,key2=value2" parser
-	for _, meta := range strings.Split(*c.id3tags, pairSeparator) {
-		pairs := strings.Split(meta, valueSeparator)
-		if len(pairs) != keyValuePairSize {
-			if c.showInformationDuringProcessing {
-				fmt.Printf("Warning: tag definition '%s' is not in the form key%svalue, ignoring\n", meta, valueSeparator)
+	} else if discoverMagicFiles && inputDirectory != nil {
+		var filter = func(file os.FileInfo) bool {
+			if !file.IsDir() {
+				if _, ok := artworkCoverFiles[strings.ToLower(file.Name())]; ok {
+					fmt.Fprintf(output, "Info: applying magic cover file '%s'\n", file.Name())
+					return true
+				}
 			}
-
-			continue
+			return false
 		}
 
-		tag, value := pairs[0], pairs[1]
-
-		_, exist := knownTags[tag]
-		if !exist {
-			if c.showInformationDuringProcessing {
-				fmt.Printf("Warning: tag '%s' is not a well-known tag, ignoring\n", tag)
-			}
-
-			continue
+		var (
+			fileNames []string
+			err       error
+		)
+		if fileNames, err = directoryReader(fs, *inputDirectory, filter, true); err != nil {
+			return nil, err
 		}
 
-		c.metadataForOutputFile[tag] = value
+		if len(fileNames) == 1 {
+			coverFileName = &fileNames[0]
+		}
 	}
 
-	return nil
-}
-
-func getID3FramesFromFile(file string) (map[string]id3v2.Framer, error) {
-	frames := make(map[string]id3v2.Framer)
-
-	masterTag, err1 := id3v2.Open(file, id3v2.Options{Parse: true})
-	if err1 != nil {
-		return nil, fmt.Errorf("can not read id3 information from media file, %v", err1)
-	}
-	defer masterTag.Close()
-
-	for id := range masterTag.AllFrames() {
-		frames[id] = masterTag.GetLastFrame(id)
+	if coverFileName == nil {
+		return nil, nil
 	}
 
-	frames[tagTrack] = &id3v2.TextFrame{Encoding: masterTag.DefaultEncoding(), Text: defaultTrackNumber}
-
-	return frames, nil
-}
-
-func applyMetadata(c *context) error {
-	if c.copyMetadataFromFileIndex == nil && len(c.metadataForOutputFile) == 0 && c.coverFilename == nil {
-		return nil
-	}
-
-	tag, err := id3v2.Open(*c.outputFilename, id3v2.Options{Parse: false})
+	fileAbs, err := fs.Abs(*coverFileName)
 	if err != nil {
-		return fmt.Errorf("can not read id3 information from media file, %v", err)
-	}
-	defer tag.Close()
-
-	frames := make(map[string]id3v2.Framer)
-
-	// Frames from file
-	if c.copyMetadataFromFileIndex != nil {
-		frames, err = getID3FramesFromFile(c.mediaFiles[*c.copyMetadataFromFileIndex])
-		if err != nil {
-			return err
-		}
+		return nil, fmt.Errorf("can not get absolute path for cover file '%s', %v", *coverFileName, err)
 	}
 
-	// frames from commandline
-	for id, value := range c.metadataForOutputFile {
-		frames[id] = &id3v2.TextFrame{Encoding: tag.DefaultEncoding(), Text: value}
-	}
-
-	if c.coverFilename != nil {
-		_, ok := frames[tagCover]
-		if !ok || c.forceCover {
-			cover, err2 := ioutil.ReadFile(*c.coverFilename)
-			if err2 != nil {
-				return fmt.Errorf("can not read cover file '%s', %v", *c.coverFilename, err2)
-			}
-
-			pic := id3v2.PictureFrame{
-				Encoding:    id3v2.EncodingUTF8,
-				MimeType:    getMimeFromFilename(*c.coverFilename),
-				PictureType: id3v2.PTFrontCover,
-				Description: "Front cover",
-				Picture:     cover,
-			}
-			tag.AddAttachedPicture(pic)
-		} else if c.showInformationDuringProcessing {
-			fmt.Println("Info: output file already has a cover file, ignoring magic file")
-		}
-	}
-
-	// Apply all
-	for id, f := range frames {
-		tag.AddFrame(id, f)
-	}
-
-	err = tag.Save()
-	if err != nil {
-		return fmt.Errorf("can not write id3 tags to tile, %v", err)
-	}
-
-	return nil
+	return &fileAbs, nil
 }
 
-func getMimeFromFilename(filename string) string {
-	switch strings.ToLower(filepath.Ext(filename)) {
+func getMimeFromFileName(fileName string) string {
+	switch strings.ToLower(filepath.Ext(fileName)) {
 	case ".mp3":
 		return "audio/mpeg"
 	case ".png":
@@ -700,50 +405,122 @@ func getMimeFromFilename(filename string) string {
 	}
 }
 
-func setCoverFile(c *context) error {
-	if c.coverFilename != nil {
-		_, err := os.Stat(*c.coverFilename)
-		if err != nil {
-			return fmt.Errorf("given cover file '%s' does not exist", *c.coverFilename)
-		}
+func getInterlaceFileName(
+	fs fileSystemAbstraction,
+	output io.Writer,
+	interlaceFileName *string,
+	filter fileInfoFilterFn,
+	discoverMagicFiles bool,
+	mediaFiles []string,
+) (*string, error) {
+	if discoverMagicFiles && interlaceFileName == nil {
+		for _, f := range mediaFiles {
+			name := filepath.Base(f)
+			if name == magicInterlaceFileName {
+				fmt.Fprintf(output, "Info: applying magic interlace file '%s'\n", f)
+				interlaceFileName = stringToPtr(f)
 
-		_, ok := supportedCoverMimeTypes[getMimeFromFilename(*c.coverFilename)]
-		if !ok {
-			return fmt.Errorf("given cover file '%s' is not supported", *c.coverFilename)
-		}
-
-		c.forceCover = true
-	} else if c.inputDirectory != nil {
-		dirContent, err := ioutil.ReadDir(*c.inputDirectory)
-		if err != nil {
-			return fmt.Errorf("can not files from directory, %v", err)
-		}
-		for _, file := range dirContent {
-			if file.IsDir() {
-				continue
-			}
-
-			if _, ok := artworkCoverFiles[strings.ToLower(file.Name())]; ok {
-				file := filepath.Join(*c.inputDirectory, file.Name())
-				if c.showInformationDuringProcessing {
-					fmt.Printf("Info: found magic cover file '%s', applying\n", file)
-				}
-				c.coverFilename = &file
 				break
 			}
 		}
 	}
 
-	if c.coverFilename == nil {
-		return nil
+	if interlaceFileName == nil {
+		return nil, nil
 	}
 
-	abs, err := filepath.Abs(*c.coverFilename)
+	inter, err := fs.Abs(*interlaceFileName)
+	interlaceFileName = &inter
+
 	if err != nil {
-		return fmt.Errorf("can not get absolute path for cover file '%s', %v", *c.coverFilename, err)
+		return nil, fmt.Errorf("can not get absolute location of file '%s', %v", *interlaceFileName, err)
 	}
 
-	c.coverFilename = &abs
+	info, err := fs.Stat(*interlaceFileName)
+	if err != nil {
+		return nil, fmt.Errorf("given interlace file '%s' does not exist", *interlaceFileName)
+	}
 
-	return nil
+	if !filter(info) {
+		return nil, fmt.Errorf("given media file '%s' is not a media file", *interlaceFileName)
+	}
+
+	return interlaceFileName, nil
+}
+
+func removeElementsFromStringList(list, elementsToRemove []string) []string {
+	index := 0
+
+loop:
+	for _, elementInList := range list {
+		for _, elementToRemove := range elementsToRemove {
+			if elementToRemove == elementInList {
+				continue loop
+			}
+		}
+		list[index] = elementInList
+		index++
+	}
+
+	return list[:index]
+}
+
+func getElementByIndex(output io.Writer, list []string, index int) (*string, error) {
+	indexZeroBased := index - 1
+
+	if index == 0 && len(list) > 0 {
+		// assume the user wanted the first file
+		indexZeroBased = 0
+
+		fmt.Fprintln(output, "Info: file index '0' for copying metadata was specified, using first file")
+	} else if indexZeroBased < 0 || indexZeroBased >= len(list) {
+		return nil, fmt.Errorf("file index '%d' for copying metadata is invalid", indexZeroBased+1)
+	}
+
+	return &list[indexZeroBased], nil
+}
+
+func addInterlaceToStringList(list []string, interlace string) []string {
+	if len(list) == 0 {
+		return list
+	}
+
+	interlaced := make([]string, 0, len(list)*interlaceFilesScaleFactor)
+	for _, f := range list {
+		interlaced = append(interlaced, f, interlace)
+	}
+
+	return interlaced[:len(interlaced)-1]
+}
+
+func kvStringToTagMap(infoWriter io.Writer, kvp string) map[string]string {
+	tags := make(map[string]string)
+
+	// Set of known tags that is used to warn the caller if the tag specified
+	// is not well-known
+	knownTags := make(map[string]bool, len(id3v2.V23CommonIDs))
+	for _, tagName := range id3v2.V23CommonIDs {
+		knownTags[tagName] = true
+	}
+
+	// Very simple "key1=value1,key2=value2" parser
+	for _, meta := range strings.Split(kvp, pairSeparator) {
+		pairs := strings.Split(meta, valueSeparator)
+		if len(pairs) != keyValuePairSize {
+			fmt.Fprintf(infoWriter, "Warning: tag definition '%s' is not in the form 'key%svalue', ignoring\n", meta, valueSeparator)
+			continue
+		}
+
+		tag, value := pairs[0], pairs[1]
+
+		_, exist := knownTags[tag]
+		if !exist {
+			fmt.Fprintf(infoWriter, "Warning: tag '%s' is not a well-known tag, ignoring\n", tag)
+			continue
+		}
+
+		tags[tag] = value
+	}
+
+	return tags
 }

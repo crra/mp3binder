@@ -6,6 +6,11 @@ Older mp3players e.g. stereos for children are not always capable of playing mul
 
 It is based on: http://www.dmulholl.com/dev/mp3cat.html and adds some more "batteries" like applying id3 tags or determine the output filename based on a given folder or apply an interlace file automatically in a folder if the file is named "\_interlace.mp3".
 
+# Screenshot
+
+![screenshot of the interface](interface.png)
+_Note: color added for clarity_
+
 # Usage
 
 ```
@@ -35,7 +40,8 @@ It is based on: http://www.dmulholl.com/dev/mp3cat.html and adds some more "batt
   -tcopy value
         copy the ID3 metadata tag from the n-th input file, starting with 1
 
-  -v    show version info
+  -version
+        show version info
 ```
 
 # Examples

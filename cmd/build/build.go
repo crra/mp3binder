@@ -37,7 +37,7 @@ const (
 )
 
 var bundles = []bundle{
-	{sourcePath: "cmd/mp3binder/mp3binder.go", targetName: "mp3binder"},
+	{sourcePath: "./cmd/mp3binder/", targetName: "mp3binder"},
 }
 
 var (
