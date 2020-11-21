@@ -71,3 +71,14 @@ Create a silence track: `sox -n -r 44100 -c 2 silence.mp3 trim 0.0 3.0`
 If the input material is FBR (fixed bit rate), generate the silence track with the same fixed bit rate using the '-C' option: `sox -n -r 44100 -c 2 -C 192 silence.mp3 trim 0.0 3.0`. (`file one.mp3` gives information about the current bit rate)
 
 And apply: `mp3bind -interlace silence.mp3 01.mp3 02.mp3`
+
+# Build instructions
+
+Build for the current platform: `go run cmd/build/build.go`
+
+## Usage
+
+    $ go run cmd/build/build.go --help
+    Usage:
+      -a    Build all targets
+      -p    Build for production
