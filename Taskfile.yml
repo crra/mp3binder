@@ -34,6 +34,20 @@ tasks:
             GOARCH: "amd64",
             EXTENSION: "",
           }
+      # macOS Apple silicon
+      - task: build-each
+        vars:
+          {
+            NAME: "{{.MP3BINDER_NAME}}",
+            MAIN: "{{.MP3BINDER_MAIN}}",
+            GOOS: "darwin",
+            GOARCH: "arm64",
+            EXTENSION: "",
+          }
+      - '{{if eq OS "darwin"}}
+        mkdir -p {{.FOLDER_DIST}}/darwin_universal &&
+        lipo -create -output {{.FOLDER_DIST}}/darwin_universal/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_amd64/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_arm64/{{.MP3BINDER_NAME}}
+        {{end}}'
       # linux 64
       - task: build-each
         vars:
