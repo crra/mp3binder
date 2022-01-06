@@ -1,0 +1,11 @@
+{
+  "editor.formatOnSave": true,
+  "files.eol": "\n",
+  "go.lintFlags": ["--fast"],
+  "go.lintTool": "golangci-lint",
+  "go.useLanguageServer": true,
+  "gopls": {
+    "gofumpt": true
+  },
+  "cSpell.words": ["bson", "logr"]
+}
