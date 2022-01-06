@@ -74,11 +74,8 @@ And apply: `mp3bind -interlace silence.mp3 01.mp3 02.mp3`
 
 # Build instructions
 
-Build for the current platform: `go run cmd/build/build.go`
+Building is always more complex then just calling `build` (e.g. adding version information into the binary or naming the binary or optimize the binary by stripping debug information). Instead of a `Makefile`, a `Taskfile.yml` is used that holds the instructions for [Task](https://taskfile.dev). 'Task' is not mandatory but simplifies the workflow. Once installed ([instructions](https://taskfile.dev/#/installation)), 'Task' provides an executable `task` that can be called with custom actions.
 
-## Usage
+For example cross compilation for multiple platforms is achieved with `task build-all`, and for the current platform with `task build`. Plain go would be: `go build .\cmd\mp3builder\` without build time optimizations and settings (e.g. version information).
 
-    $ go run cmd/build/build.go --help
-    Usage:
-      -a    Build all targets
-      -p    Build for production
+The `Taskfile.yml` gives good hints which commands and options are executed if the developer don't want to use `task`. In the end 'Task' it's just a simple task runner (collection of commands).

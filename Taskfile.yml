@@ -1,0 +1,108 @@
+version: "3"
+
+vars:
+  FOLDER_DIST: "dist"
+
+  REALM: "mp3binder"
+
+  MP3BINDER_NAME: mp3binder
+  MP3BINDER_MAIN: "./cmd/mp3binder"
+
+  # used as version
+  GIT_COMMIT:
+    sh: git describe --tags --always | sed 's/-/+/' | sed 's/^v//'
+
+tasks:
+  clean:
+    desc: Cleans temp files and folders
+    cmds:
+      - rm -rf {{.FOLDER_DIST}}
+
+  build-all:
+    desc: Build the binaries for multiple architectures.
+    deps:
+      - clean
+      - tests
+    cmds:
+      # macOS intel
+      - task: build-each
+        vars:
+          {
+            NAME: "{{.MP3BINDER_NAME}}",
+            MAIN: "{{.MP3BINDER_MAIN}}",
+            GOOS: "darwin",
+            GOARCH: "amd64",
+            EXTENSION: "",
+          }
+      # linux 64
+      - task: build-each
+        vars:
+          {
+            NAME: "{{.MP3BINDER_NAME}}",
+            MAIN: "{{.MP3BINDER_MAIN}}",
+            GOOS: "linux",
+            GOARCH: "amd64",
+            EXTENSION: "",
+          }
+      # windows 64
+      - task: build-each
+        vars:
+          {
+            NAME: "{{.MP3BINDER_NAME}}",
+            MAIN: "{{.MP3BINDER_MAIN}}",
+            GOOS: "windows",
+            GOARCH: "amd64",
+            EXTENSION: ".exe",
+          }
+  tests:
+    desc: Perform all tests
+    cmds:
+      - go test -cover -race ./...
+
+  build:
+    desc: Build all binary for the current platform.
+    deps:
+      - clean
+      - tests
+    cmds:
+      - task: build-each
+        vars:
+          {
+            NAME: "{{.MP3BINDER_NAME}}",
+            MAIN: "{{.MP3BINDER_MAIN}}",
+            GOOS: "{{OS}}",
+            GOARCH: "{{ARCH}}",
+            EXTENSION: "{{exeExt}}",
+          }
+
+  build-each:
+    vars:
+      FOLDER: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}"
+      OUTPUT: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}/{{.NAME}}{{.EXTENSION}}"
+
+    summary: Build the binary for a given platform
+    cmds:
+      - mkdir -p "{{.FOLDER}}"
+      - >-
+        go build -trimpath
+        -ldflags="-w -s
+        -X main.name="{{.NAME}}{{.EXTENSION}}"
+        -X main.version="{{.GIT_COMMIT}}"
+        -X main.realm="{{.REALM}}"
+        -extldflags '-static'" -a
+        -buildvcs=false 
+        -buildinfo=false 
+        -o {{.OUTPUT}}
+        {{.MAIN}}
+
+    generates:
+      - "{{.OUTPUT}}"
+    env:
+      NAME: "{{.NAME}}"
+      MAIN: "{{.MAIN}}"
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      GOARM: "{{.GOARM}}"
+      EXTENSION: "{{.EXTENSION}}"
+      GIT_COMMIT: "{{.GIT_COMMIT}}"
+      REALM: "{{.REALM}}"

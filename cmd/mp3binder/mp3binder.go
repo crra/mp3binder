@@ -12,7 +12,12 @@ import (
 	"github.com/crra/mp3binder/flagext"
 )
 
-var version = "development"
+var (
+	// externally set by the build system.
+	version = "dev-build"
+	name    = "mp3builder"
+	realm   = "mp3builder"
+)
 
 const (
 	extOfMp3                  = ".mp3"
@@ -45,9 +50,11 @@ func init() {
 func stringToPtr(in string) *string { return &in }
 func IntToPtr(in int) *int          { return &in }
 
-type fileStatFn func(string) (os.FileInfo, error)
-type dirReaderFn func(string) ([]os.FileInfo, error)
-type absFn func(string) (string, error)
+type (
+	fileStatFn  func(string) (os.FileInfo, error)
+	dirReaderFn func(string) ([]os.FileInfo, error)
+	absFn       func(string) (string, error)
+)
 
 type fileSystemAbstraction interface {
 	Stat(name string) (os.FileInfo, error)
@@ -357,7 +364,7 @@ func getCoverFileName(
 			return nil, fmt.Errorf("given cover file '%s' is not supported", *coverFileName)
 		}
 	} else if discoverMagicFiles && inputDirectory != nil {
-		var filter = func(file os.FileInfo) bool {
+		filter := func(file os.FileInfo) bool {
 			if !file.IsDir() {
 				if _, ok := artworkCoverFiles[strings.ToLower(file.Name())]; ok {
 					fmt.Fprintf(output, "Info: applying magic cover file '%s'\n", file.Name())
