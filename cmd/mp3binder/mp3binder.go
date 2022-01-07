@@ -10,6 +10,7 @@ import (
 
 	"github.com/bogem/id3v2"
 	"github.com/crra/mp3binder/flagext"
+	"github.com/spf13/afero"
 )
 
 var (
@@ -49,18 +50,6 @@ func init() {
 
 func stringToPtr(in string) *string { return &in }
 func IntToPtr(in int) *int          { return &in }
-
-type (
-	fileStatFn  func(string) (os.FileInfo, error)
-	dirReaderFn func(string) ([]os.FileInfo, error)
-	absFn       func(string) (string, error)
-)
-
-type fileSystemAbstraction interface {
-	Stat(name string) (os.FileInfo, error)
-	ReadDir(dirname string) ([]os.FileInfo, error)
-	Abs(path string) (string, error)
-}
 
 func newUserInput(arguments []string, output io.Writer, errorHandling flag.ErrorHandling) (*userInput, error) {
 	input := &userInput{}
@@ -121,7 +110,7 @@ type job struct {
 	tags            map[string]string
 }
 
-func newJobFromInput(fs fileSystemAbstraction, input *userInput, infoWriter io.Writer) (*job, error) {
+func newJobFromInput(fs afero.Fs, input *userInput, infoWriter io.Writer) (*job, error) {
 	var (
 		err               error
 		commandLineFiles  []string
@@ -148,7 +137,7 @@ func newJobFromInput(fs fileSystemAbstraction, input *userInput, infoWriter io.W
 	if input.inputDirectory != nil {
 		var inputDirectoryAbs string
 
-		if inputDirectoryAbs, err = fs.Abs(*input.inputDirectory); err != nil {
+		if inputDirectoryAbs, err = filepath.Abs(*input.inputDirectory); err != nil {
 			return nil, fmt.Errorf("can not get absolute location of file '%s', %v", *input.inputDirectory, err)
 		}
 
@@ -217,12 +206,12 @@ func newJobFromInput(fs fileSystemAbstraction, input *userInput, infoWriter io.W
 
 type fileInfoFilterFn func(info os.FileInfo) bool
 
-func fileListReader(fs fileSystemAbstraction, files []string, filter fileInfoFilterFn) ([]string, error) {
+func fileListReader(fs afero.Fs, files []string, filter fileInfoFilterFn) ([]string, error) {
 	for i, file := range files {
 		if !filepath.IsAbs(file) {
 			var err error
 
-			if file, err = fs.Abs(file); err != nil {
+			if file, err = filepath.Abs(file); err != nil {
 				return []string{}, fmt.Errorf("can not get absolute path for file '%s', %v", file, err)
 			}
 
@@ -247,7 +236,7 @@ func fileListReader(fs fileSystemAbstraction, files []string, filter fileInfoFil
 }
 
 func directoryReader(
-	fs fileSystemAbstraction,
+	fs afero.Fs,
 	directory string,
 	filter fileInfoFilterFn,
 	first bool,
@@ -255,7 +244,7 @@ func directoryReader(
 	var err error
 
 	if !filepath.IsAbs(directory) {
-		directory, err = fs.Abs(directory)
+		directory, err = filepath.Abs(directory)
 		if err != nil {
 			return []string{}, fmt.Errorf("can not get absolute path for directory '%s', %v", directory, err)
 		}
@@ -268,7 +257,7 @@ func directoryReader(
 		return []string{}, fmt.Errorf("provided path for '-dir' is not a directory '%s'", directory)
 	}
 
-	dirContent, err := fs.ReadDir(directory)
+	dirContent, err := afero.ReadDir(fs, directory)
 	if err != nil {
 		return []string{}, fmt.Errorf("can not read media files from directory, %v", err)
 	}
@@ -294,7 +283,7 @@ func directoryReader(
 // either the name is explicitly set or the name is derived from the
 // input directory or from the first file provided via the command line
 func getOutputFileName(
-	fs fileSystemAbstraction,
+	fs afero.Fs,
 	output io.Writer,
 	outputFileName *string,
 	forceOverwrite bool,
@@ -319,7 +308,7 @@ func getOutputFileName(
 		outputFileName = &fileName
 	}
 
-	absOutputFileName, err := fs.Abs(*outputFileName)
+	absOutputFileName, err := filepath.Abs(*outputFileName)
 	if err != nil {
 		return "", fmt.Errorf("can not get absolute location of file '%s', %v", *outputFileName, err)
 	}
@@ -348,7 +337,7 @@ func ensureProcessableFiles(length int) error {
 }
 
 func getCoverFileName(
-	fs fileSystemAbstraction,
+	fs afero.Fs,
 	output io.Writer,
 	coverFileName *string,
 	discoverMagicFiles bool,
@@ -391,7 +380,7 @@ func getCoverFileName(
 		return nil, nil
 	}
 
-	fileAbs, err := fs.Abs(*coverFileName)
+	fileAbs, err := filepath.Abs(*coverFileName)
 	if err != nil {
 		return nil, fmt.Errorf("can not get absolute path for cover file '%s', %v", *coverFileName, err)
 	}
@@ -413,7 +402,7 @@ func getMimeFromFileName(fileName string) string {
 }
 
 func getInterlaceFileName(
-	fs fileSystemAbstraction,
+	fs afero.Fs,
 	output io.Writer,
 	interlaceFileName *string,
 	filter fileInfoFilterFn,
@@ -436,7 +425,7 @@ func getInterlaceFileName(
 		return nil, nil
 	}
 
-	inter, err := fs.Abs(*interlaceFileName)
+	inter, err := filepath.Abs(*interlaceFileName)
 	interlaceFileName = &inter
 
 	if err != nil {

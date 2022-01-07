@@ -1,5 +1,3 @@
-//+build !test
-
 package main
 
 import (
@@ -12,19 +10,11 @@ import (
 
 	"github.com/crra/mp3binder/ioext"
 	"github.com/crra/mp3binder/mp3binder"
+	"github.com/spf13/afero"
 )
-
-type osFileSystem struct{}
-
-func (fs *osFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
-func (fs *osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
-}
-func (fs *osFileSystem) Abs(path string) (string, error) { return filepath.Abs(path) }
 
 func main() {
 	input, err := newUserInput(os.Args, os.Stderr, flag.ExitOnError)
-
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -40,14 +30,14 @@ func main() {
 		informationWriter = os.Stdout
 	}
 
-	filesystem := &osFileSystem{}
+	filesystem := afero.NewOsFs()
 	if err := run(input, informationWriter, filesystem); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(input *userInput, informationWriter io.Writer, fs fileSystemAbstraction) error {
+func run(input *userInput, informationWriter io.Writer, fs afero.Fs) error {
 	var (
 		err error
 		j   *job
@@ -108,7 +98,7 @@ func run(input *userInput, informationWriter io.Writer, fs fileSystemAbstraction
 		}
 	}
 
-	var progress = func(index int) {
+	progress := func(index int) {
 		if len(j.files) > index {
 			fmt.Fprintf(informationWriter, "- Processing: %s\n", filepath.Base(j.files[index]))
 		}

@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/bogem/id3v2 v1.2.0
 	github.com/dmulholl/mp3lib v1.0.0
+	github.com/spf13/afero v1.8.0
 	github.com/stretchr/testify v1.7.0
 )
 

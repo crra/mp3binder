@@ -7,5 +7,5 @@
   "gopls": {
     "gofumpt": true
   },
-  "cSpell.words": ["bson", "logr"]
+  "cSpell.words": ["afero", "bson", "logr"]
 }
