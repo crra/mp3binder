@@ -1,112 +1,52 @@
 package main
 
 import (
-	"flag"
+	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
+	"log"
 	"os"
-	"path/filepath"
+	"os/signal"
 
-	"github.com/crra/mp3binder/ioext"
-	"github.com/crra/mp3binder/mp3binder"
+	"github.com/crra/mp3binder/cli"
+	"github.com/go-logr/stdr"
 	"github.com/spf13/afero"
 )
 
+var (
+	// externally set by the build system.
+	version = "dev-build"
+	name    = "mp3builder"
+	realm   = "mp3builder"
+)
+
+// main is the entrypoint of the program.
+// main is the only place where external dependencies (e.g. output stream, logger, filesystem)
+// are resolved and where final errors are handled (e.g. writing to the console).
 func main() {
-	input, err := newUserInput(os.Args, os.Stderr, flag.ExitOnError)
+	// use the built in logger
+	log := stdr.New(log.New(os.Stdout, "", log.Lshortfile))
+
+	// create a parent context that listens on os signals (e.g. CTRL-C)
+	context, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer cancel()
+
+	// cancel the parent context and all children if an os signal arrives
+	go func() {
+		<-context.Done()
+		cancel()
+	}()
+
+	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	if input.showVersion {
-		fmt.Println(version)
-		os.Exit(0)
-	}
+	fs := afero.NewOsFs()
 
-	informationWriter := ioutil.Discard
-	if input.printInformation {
-		informationWriter = os.Stdout
-	}
-
-	filesystem := afero.NewOsFs()
-	if err := run(input, informationWriter, filesystem); err != nil {
+	// run the program and clean up
+	if err := cli.New(context, name, version, log, os.Stdout, fs, cwd).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func run(input *userInput, informationWriter io.Writer, fs afero.Fs) error {
-	var (
-		err error
-		j   *job
-	)
-
-	if j, err = newJobFromInput(fs, input, informationWriter); err != nil {
-		return err
-	}
-
-	outFile, err := os.Create(j.outputFileName)
-	if err != nil {
-		return fmt.Errorf("can not open output file to write to, %v", err)
-	}
-
-	outFileCloser := ioext.OnceCloser(outFile)
-	defer outFileCloser.Close()
-
-	in := make([]io.Reader, len(j.files))
-
-	for i, file := range j.files {
-		var rc io.ReadCloser
-
-		if rc, err = os.Open(file); err != nil {
-			return fmt.Errorf("can not open media file for reading, %v", err)
-		}
-
-		defer rc.Close()
-
-		in[i] = rc
-	}
-
-	var templateReader io.Reader
-
-	if j.tagTemplateFile != nil {
-		var templateReaderFile *os.File
-
-		if templateReaderFile, err = os.Open(*j.tagTemplateFile); err != nil {
-			return fmt.Errorf("can not open template media file for reading, %v", err)
-		}
-		defer templateReaderFile.Close()
-		templateReader = templateReaderFile
-	}
-
-	var cover *mp3binder.Cover
-
-	if j.coverFileName != nil {
-		var coverFile *os.File
-
-		if coverFile, err = os.Open(*j.coverFileName); err != nil {
-			return fmt.Errorf("can not open media file for reading, %v", err)
-		}
-		defer coverFile.Close()
-
-		cover = &mp3binder.Cover{
-			MimeType: getMimeFromFileName(*j.coverFileName),
-			Reader:   coverFile,
-			Force:    input.coverFileName != nil,
-		}
-	}
-
-	progress := func(index int) {
-		if len(j.files) > index {
-			fmt.Fprintf(informationWriter, "- Processing: %s\n", filepath.Base(j.files[index]))
-		}
-	}
-
-	if err := mp3binder.Bind(outFile, templateReader, j.tags, cover, progress, in...); err != nil {
-		return err
-	}
-
-	return nil
 }
