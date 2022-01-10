@@ -119,6 +119,25 @@ func TestDirectoryWithTwoFilesAndIgnoredMagicInterlaceFile(t *testing.T) {
 	}
 }
 
+func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/interlace.mp3", []byte("interlace"), 0644)
+	afero.WriteFile(fs, "/_interlace.mp3", []byte("interlace"), 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	files := []string{validFileName1, "interlace.mp3", validFileName2, "interlace.mp3", "_interlace.mp3"}
+	err := a.args(nil, files)
+	if assert.NoError(t, err) {
+		assert.Equal(t, len(files), len(a.mediaFiles))
+	}
+}
+
 func TestSubDirectoryWithTwoFiles(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), []byte("1"), 0644)
