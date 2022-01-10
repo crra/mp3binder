@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/carolynvs/aferox"
@@ -102,5 +103,21 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
 		assert.Equal(t, "", a.coverFile)
+	}
+}
+
+func TestDiscoverCoverFileUppercased(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+strings.ToUpper(validCoverFile), []byte("cover"), 0644)
+
+	a := &application{
+		fs: aferox.NewAferox("/", fs),
+	}
+
+	err := a.args(nil, []string{"."})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "/"+strings.ToUpper(validCoverFile), a.coverFile)
 	}
 }
