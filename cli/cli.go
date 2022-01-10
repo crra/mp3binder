@@ -7,6 +7,7 @@ import (
 	"io"
 	fs2 "io/fs"
 	"path/filepath"
+	"sort"
 
 	"github.com/crra/mp3binder/slice"
 	"github.com/crra/mp3binder/value"
@@ -24,6 +25,7 @@ var (
 	ErrInvalidFile      = errors.New("invalid file")
 	ErrFileNotFound     = errors.New("file not found")
 	ErrOutputFileExists = errors.New("output file exists")
+	ErrCanTPartition    = errors.New("can't partition slice")
 )
 
 const (
@@ -72,6 +74,15 @@ type application struct {
 
 type Service interface {
 	Execute() error
+}
+
+type mediaFile struct {
+	path          string
+	explicitlySet bool
+}
+
+func (m mediaFile) String() string {
+	return m.path
 }
 
 func New(parent context.Context, name, version string, log logr.Logger, status io.Writer, fs afero.Fs, cwd string) Service {
@@ -138,8 +149,8 @@ func isAcceptedMediaFile(path string, skipInterlaceFiles bool) bool {
 
 // getMediaFilesFromArguments takes the program arguments and either accepts the argument as a file or if the argument
 // is a directory, accepts the files contained in the directory.
-func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]string, string, error) {
-	var files []string
+func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]mediaFile, string, error) {
+	var files []mediaFile
 	var outputFileCandidate string
 
 	for _, arg := range args {
@@ -163,7 +174,7 @@ func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]string, stri
 
 // getMediaFilesFromArgument takes a program argument and either accepts the argument as a file or if the argument
 // is a directory, accepts the files contained in the directory.
-func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, error) {
+func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]mediaFile, string, error) {
 	arg = fs.Abs(arg)
 
 	info, err := fs.Stat(arg)
@@ -177,7 +188,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, 
 	// regular file
 	if !info.IsDir() {
 		if isAcceptedMediaFile(arg, false) {
-			return []string{arg}, candidateName, nil
+			return []mediaFile{{path: arg, explicitlySet: true}}, candidateName, nil
 		}
 
 		return nil, "", fmt.Errorf("media file '%s': %w", info.Name(), ErrInvalidFile)
@@ -189,7 +200,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, 
 		return nil, "", err
 	}
 
-	var files []string
+	var files []mediaFile
 	for _, file := range dirListing {
 		if file.IsDir() {
 			continue
@@ -200,7 +211,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, 
 			continue
 		}
 
-		files = append(files, abs)
+		files = append(files, mediaFile{path: abs, explicitlySet: false})
 	}
 
 	return files, candidateName, nil
@@ -301,12 +312,54 @@ func asOutputFile(fileName string) string {
 	return fileName
 }
 
+const (
+	partitionExplicitlySet = "explicitly"
+	partitionDiscovered    = "discovered"
+)
+
+func mediaFilePartitionStr(m mediaFile) string {
+	if m.explicitlySet {
+		return partitionExplicitlySet
+	}
+
+	return partitionDiscovered
+}
+
+func removeDuplicatesIfSourceMixed(files []mediaFile) ([]string, error) {
+	if len(files) == 0 {
+		return []string{}, nil
+	}
+
+	partition := slice.PartitionStr(files, mediaFilePartitionStr)
+	explicitlySet, _ := partition[partitionExplicitlySet]
+	discovered, _ := partition[partitionDiscovered]
+
+	// if there are no partitions, just return the files
+	if len(explicitlySet) == 0 || len(discovered) == 0 {
+		return slice.Map(files, func(m mediaFile) string { return m.path }), nil
+	}
+
+	// TODO: generalize the extract functions
+
+	// remove the explicitly set files from the discovered files
+	orderedFiles := slice.UnionButIntersectionFromB(discovered, explicitlySet, func(r slice.PartitionResult[mediaFile]) string { return r.String() })
+
+	// sort by the original index
+	sort.Slice(orderedFiles, func(p, q int) bool {
+		return orderedFiles[p].OriginalIndex < orderedFiles[q].OriginalIndex
+	})
+
+	return slice.Map(orderedFiles, func(r slice.PartitionResult[mediaFile]) string { return r.String() }), nil
+}
+
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
 func (a *application) args(c *cobra.Command, args []string) error {
-	var err error
-	var outputCandidateName string
+	mediaFiles, outputCandidateName, err := getMediaFilesFromArguments(a.fs, args)
+	if err != nil {
+		return err
+	}
 
-	a.mediaFiles, outputCandidateName, err = getMediaFilesFromArguments(a.fs, args)
+	a.mediaFiles, err = removeDuplicatesIfSourceMixed(mediaFiles)
 	if err != nil {
 		return err
 	}
