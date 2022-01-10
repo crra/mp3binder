@@ -25,7 +25,6 @@ var (
 	ErrInvalidFile      = errors.New("invalid file")
 	ErrFileNotFound     = errors.New("file not found")
 	ErrOutputFileExists = errors.New("output file exists")
-	ErrCanTPartition    = errors.New("can't partition slice")
 )
 
 const (
@@ -325,9 +324,9 @@ func mediaFilePartitionStr(m mediaFile) string {
 	return partitionDiscovered
 }
 
-func removeDuplicatesIfSourceMixed(files []mediaFile) ([]string, error) {
+func removeDuplicatesIfSourceMixed(files []mediaFile) []string {
 	if len(files) == 0 {
-		return []string{}, nil
+		return []string{}
 	}
 
 	partition := slice.PartitionStr(files, mediaFilePartitionStr)
@@ -336,7 +335,7 @@ func removeDuplicatesIfSourceMixed(files []mediaFile) ([]string, error) {
 
 	// if there are no partitions, just return the files
 	if len(explicitlySet) == 0 || len(discovered) == 0 {
-		return slice.Map(files, func(m mediaFile) string { return m.path }), nil
+		return slice.Map(files, func(m mediaFile) string { return m.path })
 	}
 
 	// TODO: generalize the extract functions
@@ -349,7 +348,7 @@ func removeDuplicatesIfSourceMixed(files []mediaFile) ([]string, error) {
 		return orderedFiles[p].OriginalIndex < orderedFiles[q].OriginalIndex
 	})
 
-	return slice.Map(orderedFiles, func(r slice.PartitionResult[mediaFile]) string { return r.String() }), nil
+	return slice.Map(orderedFiles, func(r slice.PartitionResult[mediaFile]) string { return r.String() })
 }
 
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
@@ -359,10 +358,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	a.mediaFiles, err = removeDuplicatesIfSourceMixed(mediaFiles)
-	if err != nil {
-		return err
-	}
+	a.mediaFiles = removeDuplicatesIfSourceMixed(mediaFiles)
 
 	if len(a.mediaFiles) == 0 {
 		return ErrNoInput
