@@ -330,7 +330,7 @@ func removeDuplicatesIfSourceMixed(files []mediaFile) []string {
 		return []string{}
 	}
 
-	partition := slice.PartitionStr(files, mediaFilePartitionStr)
+	partition := slice.Partition(files, mediaFilePartitionStr)
 	explicitlySet, _ := partition[partitionExplicitlySet]
 	discovered, _ := partition[partitionDiscovered]
 
@@ -339,17 +339,15 @@ func removeDuplicatesIfSourceMixed(files []mediaFile) []string {
 		return slice.Map(files, func(m mediaFile) string { return m.path })
 	}
 
-	// TODO: generalize the extract functions
-
 	// remove the explicitly set files from the discovered files
-	orderedFiles := slice.UnionButIntersectionFromB(discovered, explicitlySet, func(r slice.PartitionResult[mediaFile]) string { return r.String() })
+	orderedFiles := slice.UnionButIntersectionFromB(discovered, explicitlySet, slice.PartitionResultUnwrap[mediaFile])
 
 	// sort by the original index
 	sort.Slice(orderedFiles, func(p, q int) bool {
 		return orderedFiles[p].OriginalIndex < orderedFiles[q].OriginalIndex
 	})
 
-	return slice.Map(orderedFiles, func(r slice.PartitionResult[mediaFile]) string { return r.String() })
+	return slice.Map(orderedFiles, slice.PartitionResultUnwrap[mediaFile])
 }
 
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
