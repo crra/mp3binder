@@ -1,5 +1,8 @@
 package cli
 
+// TODO: this is a direct copy of the cover file test cases
+//       the code is already generic, but the tests are not.
+
 import (
 	"testing"
 
@@ -9,74 +12,74 @@ import (
 )
 
 const (
-	validCoverFile   = "cover.jpg"
-	invalidCoverFile = "_"
+	validInterlaceFile   = "_interlace.mp3"
+	invalidInterlaceFile = "_"
 )
 
-func TestNonExistingCoverFile(t *testing.T) {
+func TestNonExistingInterlaceFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
 
 	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: invalidCoverFile,
+		fs:            aferox.NewAferox("/", fs),
+		interlaceFile: invalidInterlaceFile,
 	}
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrFileNotFound)
 }
 
-func TestInvalidCoverFile(t *testing.T) {
+func TestInvalidInterlaceFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
-	afero.WriteFile(fs, "/"+invalidCoverFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+invalidInterlaceFile, []byte("interlace"), 0644)
 
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
-		coverFile: invalidCoverFile,
+		coverFile: invalidInterlaceFile,
 	}
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrInvalidFile)
 }
 
-func TestCoverFileIsDir(t *testing.T) {
+func TestInterlaceFileIsDir(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
-	fs.MkdirAll("/"+validCoverFile, 0755)
+	fs.MkdirAll("/"+validInterlaceFile, 0755)
 
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
-		coverFile: validCoverFile,
+		coverFile: validInterlaceFile,
 	}
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrInvalidFile)
 }
 
-func TestValidCoverFile(t *testing.T) {
+func TestValidInterlaceFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
-	afero.WriteFile(fs, "/"+validCoverFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile, []byte("interlace"), 0644)
 
 	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: validCoverFile,
+		fs:            aferox.NewAferox("/", fs),
+		interlaceFile: validInterlaceFile,
 	}
 
 	err := a.args(nil, []string{"."})
 	assert.NoError(t, err)
 }
 
-func TestDiscoverCoverFile(t *testing.T) {
+func TestDiscoverInterlaceFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
-	afero.WriteFile(fs, "/"+validCoverFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile, []byte("cover"), 0644)
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),
@@ -84,15 +87,15 @@ func TestDiscoverCoverFile(t *testing.T) {
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/"+validCoverFile, a.coverFile)
+		assert.Equal(t, "/"+validInterlaceFile, a.interlaceFile)
 	}
 }
 
-func TestNoCoverFileDiscovery(t *testing.T) {
+func TestNoInterlaceFileDiscovery(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
-	afero.WriteFile(fs, "/"+validCoverFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile, []byte("cover"), 0644)
 
 	a := &application{
 		fs:          aferox.NewAferox("/", fs),
@@ -101,6 +104,6 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "", a.coverFile)
+		assert.Equal(t, "", a.interlaceFile)
 	}
 }
