@@ -13,10 +13,10 @@ func Contains[K comparable](haystack []K, needle K) bool {
 	return false
 }
 
-func FirstEqual[K comparable](a []K, b []K) *K {
+func FirstEqual[K comparable](a, b []K, fn func(K) K) *K {
 	for _, aa := range a {
 		for _, bb := range b {
-			if aa == bb {
+			if fn(aa) == fn(bb) {
 				return &aa
 			}
 		}
@@ -29,7 +29,7 @@ type Stringer interface {
 	String() string
 }
 
-func Concat[T Stringer](a []T, b []T) []string {
+func Concat[T Stringer](a, b []T) []string {
 	values := make([]string, len(a)*len(b))
 
 	index := 0
@@ -47,7 +47,7 @@ func Concat[T Stringer](a []T, b []T) []string {
 	return values
 }
 
-func ConcatStr(a []string, b []string) []string {
+func ConcatStr(a, b []string) []string {
 	values := make([]string, len(a)*len(b))
 
 	index := 0
