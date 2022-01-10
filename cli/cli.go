@@ -43,6 +43,7 @@ var (
 	coverFileExtensions = []string{".jpg", ".png"}
 	coverFileNames      = []string{"cover", "folder", "album"}
 	coverFiles          = slice.ConcatStr(coverFileNames, coverFileExtensions)
+	interlaceFiles      = []string{"interlace.mp3", "_interlace.mp3"}
 )
 
 type application struct {
@@ -127,6 +128,11 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 
 // isAcceptedMediaFile indicates if a file is accepted for joining.
 func isAcceptedMediaFile(path string) bool {
+	// ignore the magic interlace files
+	if slice.Contains(interlaceFiles, filepath.Base(path)) {
+		return false
+	}
+
 	return slice.Contains(mediaFileExtensions, filepath.Ext(path))
 }
 
@@ -205,21 +211,25 @@ func isAcceptedCoverFile(path string) bool {
 	return slice.Contains(coverFileExtensions, filepath.Ext(path))
 }
 
-// getCoverFile returns the coverfile either explicitly provided or found in the current directory.
-func getCoverFile(fs aferox.Aferox, noDiscovery bool, cover string) (string, error) {
+// isAcceptedCoverFile returns true if the provided path points to a valid interlace file.
+func isAcceptedInterlaceFile(path string) bool {
+	return slice.Contains(mediaFileExtensions, filepath.Ext(path))
+}
+
+func getDiscoverableFile(fs aferox.Aferox, file string, noDiscovery bool, fileType string, accept func(string) bool, wellKnownFiles []string) (string, error) {
 	// not set and no discovery
-	if cover == "" && noDiscovery {
+	if file == "" && noDiscovery {
 		return "", nil
 	}
 
 	// explicitly set
-	if cover != "" {
-		cover = fs.Abs(cover)
+	if file != "" {
+		file = fs.Abs(file)
 
-		info, err := fs.Stat(cover)
+		info, err := fs.Stat(file)
 		if err != nil {
 			if errors.Is(err, fs2.ErrNotExist) {
-				return "", fmt.Errorf("cover: '%s': %w", cover, ErrFileNotFound)
+				return "", fmt.Errorf("%s file: '%s': %w", fileType, file, ErrFileNotFound)
 			}
 
 			return "", err
@@ -229,11 +239,11 @@ func getCoverFile(fs aferox.Aferox, noDiscovery bool, cover string) (string, err
 			return "", ErrInvalidFile
 		}
 
-		if !isAcceptedCoverFile(cover) {
-			return "", fmt.Errorf("cover file '%s': %w", info.Name(), ErrInvalidFile)
+		if !accept(file) {
+			return "", fmt.Errorf("%s file '%s': %w", fileType, info.Name(), ErrInvalidFile)
 		}
 
-		return cover, nil
+		return file, nil
 	}
 
 	// discover
@@ -243,7 +253,7 @@ func getCoverFile(fs aferox.Aferox, noDiscovery bool, cover string) (string, err
 		return "", err
 	}
 
-	if found := slice.FirstEqual(slice.Map(dirListing, func(info fs2.FileInfo) string { return info.Name() }), coverFiles); found != nil {
+	if found := slice.FirstEqual(slice.Map(dirListing, func(info fs2.FileInfo) string { return info.Name() }), wellKnownFiles); found != nil {
 		return filepath.Join(dir, *found), nil
 	}
 
@@ -309,12 +319,17 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return ErrAtLeastTwo
 	}
 
-	a.coverFile, err = getCoverFile(a.fs, a.noDiscovery, a.coverFile)
+	a.coverFile, err = getDiscoverableFile(a.fs, a.coverFile, a.noDiscovery, "cover", isAcceptedCoverFile, coverFiles)
 	if err != nil {
 		return err
 	}
 
 	a.outputFile, err = getOutputFile(a.fs, a.outputFile, a.overwrite, asOutputFile(outputCandidateName))
+	if err != nil {
+		return err
+	}
+
+	a.interlaceFile, err = getDiscoverableFile(a.fs, a.interlaceFile, a.noDiscovery, "interlace", isAcceptedInterlaceFile, interlaceFiles)
 	if err != nil {
 		return err
 	}
