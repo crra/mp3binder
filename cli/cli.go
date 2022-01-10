@@ -8,6 +8,7 @@ import (
 	fs2 "io/fs"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/crra/mp3binder/slice"
 	"github.com/crra/mp3binder/value"
@@ -263,7 +264,7 @@ func getDiscoverableFile(fs aferox.Aferox, file string, noDiscovery bool, fileTy
 		return "", err
 	}
 
-	if found := slice.FirstEqual(slice.Map(dirListing, func(info fs2.FileInfo) string { return info.Name() }), wellKnownFiles); found != nil {
+	if found := slice.FirstEqual(slice.Map(dirListing, func(info fs2.FileInfo) string { return info.Name() }), wellKnownFiles, strings.ToLower); found != nil {
 		return filepath.Join(dir, *found), nil
 	}
 
