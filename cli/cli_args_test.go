@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/carolynvs/aferox"
@@ -9,11 +10,13 @@ import (
 )
 
 const (
-	validFileName1 = "sample1.mp3"
-	validFileName2 = "sample2.mp3"
+	sampleDirectory = "sampleDirectory"
 
-	invalidFileName1 = "sample1.mp33"
-	invalidFileName2 = "sample2.mp33"
+	validFileName1 = "validSampleFile1.mp3"
+	validFileName2 = "validSampleFile2.mp3"
+
+	invalidFileName1 = "invalidSampleFile1.mp33"
+	invalidFileName2 = "invalidSampleFile2.mp33"
 )
 
 func TestNoParameters(t *testing.T) {
@@ -34,6 +37,29 @@ func TestDirectoryWithNoFile(t *testing.T) {
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrNoInput)
+}
+
+func TestDirectoryWithNonExistingDirectory(t *testing.T) {
+	fs := afero.NewMemMapFs()
+
+	a := &application{
+		fs: aferox.NewAferox("/", fs),
+	}
+
+	err := a.args(nil, []string{sampleDirectory})
+	assert.ErrorIs(t, err, ErrFileNotFound)
+}
+
+func TestDirectoryWithNonExistingFile(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+
+	a := &application{
+		fs: aferox.NewAferox("/", fs),
+	}
+
+	err := a.args(nil, []string{validFileName1, validFileName2})
+	assert.ErrorIs(t, err, ErrFileNotFound)
 }
 
 func TestDirectoryWithNoValidFile(t *testing.T) {
@@ -67,11 +93,26 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, []byte("1"), 0644)
 
 	a := &application{
-		fs: aferox.NewAferox("/", fs),
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
 	}
 
 	err := a.args(nil, []string{"."})
 	assert.NoError(t, err)
+}
+
+func TestSubDirectoryWithTwoFiles(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), []byte("1"), 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{"."})
+	assert.ErrorIs(t, err, ErrNoInput)
 }
 
 func TestOneFile(t *testing.T) {
@@ -104,7 +145,8 @@ func TestTwoFiles(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
 
 	a := &application{
-		fs: aferox.NewAferox("/", fs),
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
 	}
 
 	err := a.args(nil, []string{validFileName1, validFileName2})

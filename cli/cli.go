@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/crra/mp3binder/slice"
+	"github.com/crra/mp3binder/value"
 
 	"github.com/carolynvs/aferox"
 	"github.com/go-logr/logr"
@@ -17,11 +18,12 @@ import (
 )
 
 var (
-	ErrNoInput      = errors.New("no input files specified")
-	ErrAtLeastTwo   = errors.New("at least two files are required")
-	ErrIsDir        = errors.New("input file is directory")
-	ErrInvalidFile  = errors.New("invalid file")
-	ErrFileNotFound = errors.New("file not found")
+	ErrNoInput          = errors.New("no input files specified")
+	ErrAtLeastTwo       = errors.New("at least two files are required")
+	ErrIsDir            = errors.New("input file is directory")
+	ErrInvalidFile      = errors.New("invalid file")
+	ErrFileNotFound     = errors.New("file not found")
+	ErrOutputFileExists = errors.New("output file exists")
 )
 
 const (
@@ -36,6 +38,7 @@ const (
 )
 
 var (
+	outputFileExtension = ".mp3"
 	mediaFileExtensions = []string{".mp3"}
 	coverFileExtensions = []string{".jpg", ".png"}
 	coverFileNames      = []string{"cover", "folder", "album"}
@@ -129,48 +132,55 @@ func isAcceptedMediaFile(path string) bool {
 
 // getMediaFilesFromArguments takes the program arguments and either accepts the argument as a file or if the argument
 // is a directory, accepts the files contained in the directory.
-func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]string, error) {
+func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]string, string, error) {
 	var files []string
+	var outputFileCandidate string
 
 	for _, arg := range args {
-		filesFromParameter, err := getMediaFilesFromArgument(fs, arg)
+		filesFromParameter, candidate, err := getMediaFilesFromArgument(fs, arg)
 		if err != nil {
 			if errors.Is(err, fs2.ErrNotExist) {
-				return nil, fmt.Errorf("file: '%s': %w", arg, ErrFileNotFound)
+				return nil, "", fmt.Errorf("file: '%s': %w", arg, ErrFileNotFound)
 			}
 
-			return nil, err
+			return nil, "", err
 		}
 
+		if outputFileCandidate == "" && candidate != "" {
+			outputFileCandidate = candidate
+		}
 		files = append(files, filesFromParameter...)
 	}
 
-	return files, nil
+	return files, outputFileCandidate, nil
 }
 
 // getMediaFilesFromArgument takes a program argument and either accepts the argument as a file or if the argument
 // is a directory, accepts the files contained in the directory.
-func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, error) {
-	abs := fs.Abs(arg)
+func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, error) {
+	arg = fs.Abs(arg)
 
-	info, err := fs.Stat(abs)
+	info, err := fs.Stat(arg)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+
+	// special case for root directories (e.g. removable media)
+	candidateName := value.OrDefaultStr(info.Name(), "root")
 
 	// regular file
 	if !info.IsDir() {
-		if isAcceptedMediaFile(abs) {
-			return []string{abs}, nil
+		if isAcceptedMediaFile(arg) {
+			return []string{arg}, candidateName, nil
 		}
 
-		return nil, fmt.Errorf("media file '%s': %w", info.Name(), ErrInvalidFile)
+		return nil, "", fmt.Errorf("media file '%s': %w", info.Name(), ErrInvalidFile)
 	}
 
 	// files from a directory
 	dirListing, err := fs.ReadDir(arg)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var files []string
@@ -179,7 +189,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, error) {
 			continue
 		}
 
-		abs := fs.Abs(filepath.Join(abs, file.Name()))
+		abs := fs.Abs(filepath.Join(arg, file.Name()))
 		if !isAcceptedMediaFile(abs) {
 			continue
 		}
@@ -187,7 +197,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, error) {
 		files = append(files, abs)
 	}
 
-	return files, nil
+	return files, candidateName, nil
 }
 
 // isAcceptedCoverFile returns true if the provided path points to a valid cover file.
@@ -240,24 +250,71 @@ func getCoverFile(fs aferox.Aferox, noDiscovery bool, cover string) (string, err
 	return "", nil
 }
 
+func getOutputFile(fs aferox.Aferox, outputFile string, overwrite bool, candidate string) (string, error) {
+	if outputFile == "" {
+		outputFile = candidate
+	}
+
+	outputFile = fs.Abs(outputFile)
+
+	for {
+		info, err := fs.Stat(outputFile)
+		if err != nil {
+			if errors.Is(err, fs2.ErrNotExist) {
+				return outputFile, nil
+			}
+		}
+
+		if info.IsDir() {
+			name := info.Name()
+			if name == "" {
+				name = candidate
+			}
+
+			outputFile = filepath.Join(outputFile, candidate)
+			continue
+		}
+
+		if !overwrite {
+			return "", ErrOutputFileExists
+		}
+
+		return outputFile, nil
+	}
+}
+
+func asOutputFile(fileName string) string {
+	if filepath.Ext(fileName) != outputFileExtension {
+		fileName += outputFileExtension
+	}
+
+	return fileName
+}
+
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
 func (a *application) args(c *cobra.Command, args []string) error {
-	mediaFiles, err := getMediaFilesFromArguments(a.fs, args)
+	var err error
+	var outputCandidateName string
+
+	a.mediaFiles, outputCandidateName, err = getMediaFilesFromArguments(a.fs, args)
 	if err != nil {
 		return err
 	}
 
-	if len(mediaFiles) == 0 {
+	if len(a.mediaFiles) == 0 {
 		return ErrNoInput
 	}
 
-	if len(mediaFiles) < 2 {
+	if len(a.mediaFiles) < 2 {
 		return ErrAtLeastTwo
 	}
 
-	a.mediaFiles = mediaFiles
-
 	a.coverFile, err = getCoverFile(a.fs, a.noDiscovery, a.coverFile)
+	if err != nil {
+		return err
+	}
+
+	a.outputFile, err = getOutputFile(a.fs, a.outputFile, a.overwrite, asOutputFile(outputCandidateName))
 	if err != nil {
 		return err
 	}

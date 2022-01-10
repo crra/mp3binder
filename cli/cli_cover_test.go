@@ -42,6 +42,21 @@ func TestInvalidCoverFile(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidFile)
 }
 
+func TestCoverFileIsDir(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	fs.MkdirAll("/"+validCoverFile, 0755)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		coverFile: validCoverFile,
+	}
+
+	err := a.args(nil, []string{"."})
+	assert.ErrorIs(t, err, ErrInvalidFile)
+}
+
 func TestValidCoverFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
@@ -51,6 +66,7 @@ func TestValidCoverFile(t *testing.T) {
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
 		coverFile: validCoverFile,
+		overwrite: true,
 	}
 
 	err := a.args(nil, []string{"."})
@@ -64,7 +80,8 @@ func TestDiscoverCoverFile(t *testing.T) {
 	afero.WriteFile(fs, "/"+validCoverFile, []byte("cover"), 0644)
 
 	a := &application{
-		fs: aferox.NewAferox("/", fs),
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
 	}
 
 	err := a.args(nil, []string{"."})
@@ -82,6 +99,7 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 	a := &application{
 		fs:          aferox.NewAferox("/", fs),
 		noDiscovery: true,
+		overwrite:   true,
 	}
 
 	err := a.args(nil, []string{"."})
