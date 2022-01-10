@@ -14,6 +14,7 @@ const (
 
 	validFileName1 = "validSampleFile1.mp3"
 	validFileName2 = "validSampleFile2.mp3"
+	validFileName3 = "validSampleFile3.mp3"
 
 	invalidFileName1 = "invalidSampleFile1.mp33"
 	invalidFileName2 = "invalidSampleFile2.mp33"
@@ -212,4 +213,89 @@ func TestOneFileAndADirectory(t *testing.T) {
 
 	err := a.args(nil, []string{validFileName1, validFileName2})
 	assert.Error(t, err, ErrAtLeastTwo)
+}
+
+func TestFilesAndDirectoryUnique(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{".", validFileName1, validFileName2})
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{"/" + validFileName1, "/" + validFileName2}, a.mediaFiles)
+	}
+}
+
+func TestFilesAndDirectoryUniqueWithExtraFromDirectoryDirectoryFirst(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName3, []byte("3"), 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{".", validFileName1, validFileName2})
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"/" + validFileName3,
+			"/" + validFileName1,
+			"/" + validFileName2,
+		}, a.mediaFiles)
+	}
+}
+
+func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirectoryLast(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName3, []byte("3"), 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{validFileName1, validFileName2, "."})
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"/" + validFileName1,
+			"/" + validFileName2,
+			"/" + validFileName3,
+		}, a.mediaFiles)
+	}
+}
+
+func TestFilesAndDirectoryUniqueButKeepDuplicatesFromArg(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{
+		".",
+		validFileName1,
+		validFileName1,
+		validFileName2,
+		validFileName2,
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"/" + validFileName1,
+			"/" + validFileName1,
+			"/" + validFileName2,
+			"/" + validFileName2,
+		}, a.mediaFiles)
+	}
 }
