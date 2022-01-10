@@ -83,16 +83,9 @@ func (p *PartitionResult[T]) String() string {
 	return p.Element.String()
 }
 
-type PartitionStrResult struct {
-	Element       string
-	OriginalIndex int
-}
+func PartitionResultUnwrap[T Stringer](r PartitionResult[T]) string { return r.String() }
 
-func (p *PartitionStrResult) String() string {
-	return p.Element
-}
-
-func PartitionStr[T Stringer, K comparable](haystack []T, fn func(T) K) map[K][]PartitionResult[T] {
+func Partition[T Stringer, K comparable](haystack []T, fn func(T) K) map[K][]PartitionResult[T] {
 	p := make(map[K][]PartitionResult[T])
 
 	for i, e := range haystack {
