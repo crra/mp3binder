@@ -127,9 +127,9 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 }
 
 // isAcceptedMediaFile indicates if a file is accepted for joining.
-func isAcceptedMediaFile(path string) bool {
+func isAcceptedMediaFile(path string, skipInterlaceFiles bool) bool {
 	// ignore the magic interlace files
-	if slice.Contains(interlaceFiles, filepath.Base(path)) {
+	if skipInterlaceFiles && slice.Contains(interlaceFiles, filepath.Base(path)) {
 		return false
 	}
 
@@ -176,7 +176,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, 
 
 	// regular file
 	if !info.IsDir() {
-		if isAcceptedMediaFile(arg) {
+		if isAcceptedMediaFile(arg, false) {
 			return []string{arg}, candidateName, nil
 		}
 
@@ -196,7 +196,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]string, string, 
 		}
 
 		abs := fs.Abs(filepath.Join(arg, file.Name()))
-		if !isAcceptedMediaFile(abs) {
+		if !isAcceptedMediaFile(abs, true) {
 			continue
 		}
 
