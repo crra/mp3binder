@@ -106,12 +106,12 @@ func PartitionStr[T Stringer, K comparable](haystack []T, fn func(T) K) map[K][]
 // UnionButIntersectionFromA takes two slices (a and b) and combines the slices (incl. duplicates from 'b').
 // If an element in 'a' is also present in 'b' (intersection) the value from 'b' (incl. duplicates) is used instead.
 func UnionButIntersectionFromB[T any, K comparable](a, b []T, fn func(T) K) []T {
-	union := make([]T, 0, len(a)+len(b))
+	union := make([]T, len(b), len(a)+len(b))
 	bElComps := make([]K, len(b))
 
 	// 'b' has priority over 'a' so keep all the elements (incl. duplicates)
 	for i, bb := range b {
-		union = append(union, bb)
+		union[i] = bb
 		// convert elements from 'b' as comparable: O(n)
 		bElComps[i] = fn(bb)
 	}
