@@ -390,9 +390,10 @@ func (a *application) args(c *cobra.Command, args []string) error {
 	if a.debug {
 		padding := len(strconv.Itoa(len(a.mediaFiles)))
 
+		fmt.Fprintf(a.status, "The following files will be 'bound' as: '%s'\n", a.outputPath)
 		format := fmt.Sprintf("%%%[1]dd: %%s\n", padding)
 		for i, f := range a.mediaFiles {
-			fmt.Fprintf(a.status, format, i, f)
+			fmt.Fprintf(a.status, format, i+1, f)
 		}
 	}
 
