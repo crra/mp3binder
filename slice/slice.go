@@ -74,17 +74,22 @@ func Map[T any, U any](list []T, fn func(T) U) []U {
 	return values
 }
 
+// A partition result wraps an element with its original index before the partitioning to be able
+// preserve the original order if unified again.
 type PartitionResult[T Stringer] struct {
 	Element       T
 	OriginalIndex int
 }
 
-func (p *PartitionResult[T]) String() string {
-	return p.Element.String()
+func (p PartitionResult[T]) String() string {
+	return (p.Element).String()
 }
 
-func PartitionResultUnwrap[T Stringer](r PartitionResult[T]) string { return r.String() }
+// String 'unboxes' any type that impelements the `Stringer` interface to a string which also happens to implement `comparable`.
+func String[T Stringer](t T) string { return t.String() }
 
+// Partition takes a slice of generic types and applies a partition function to it. It wraps the partition results with an index
+// so that it can be sorted to preserve the initial order.
 func Partition[T Stringer, K comparable](haystack []T, fn func(T) K) map[K][]PartitionResult[T] {
 	p := make(map[K][]PartitionResult[T])
 
@@ -98,7 +103,7 @@ func Partition[T Stringer, K comparable](haystack []T, fn func(T) K) map[K][]Par
 
 // UnionButIntersectionFromA takes two slices (a and b) and combines the slices (incl. duplicates from 'b').
 // If an element in 'a' is also present in 'b' (intersection) the value from 'b' (incl. duplicates) is used instead.
-func UnionButIntersectionFromB[T any, K comparable](a, b []T, fn func(T) K) []T {
+func UnionButIntersectionFromB[T Stringer, K comparable](a, b []T, fn func(T) K) []T {
 	union := make([]T, len(b), len(a)+len(b))
 	bElComps := make([]K, len(b))
 
