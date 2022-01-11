@@ -145,8 +145,7 @@ func TestSubDirectoryWithTwoFiles(t *testing.T) {
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), []byte("1"), 0644)
 
 	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		overwrite: true,
+		fs: aferox.NewAferox("/", fs),
 	}
 
 	err := a.args(nil, []string{"."})

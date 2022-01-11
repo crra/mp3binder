@@ -64,7 +64,7 @@ type application struct {
 	debug         bool
 	overwrite     bool
 	interlaceFile string
-	outputFile    string
+	outputPath    string
 	applyTags     string
 	copyTags      int
 	mediaFiles    []string
@@ -72,7 +72,9 @@ type application struct {
 	command *cobra.Command
 }
 
+// Service describes the cli service.
 type Service interface {
+	// Execute executes the service.
 	Execute() error
 }
 
@@ -118,7 +120,7 @@ func New(parent context.Context, name, version string, log logr.Logger, status i
 	f.BoolVar(&app.debug, flagDebug, app.debug, "prints debug information for each processing step")
 	f.BoolVar(&app.overwrite, flagOverwrite, app.overwrite, "overwrite an existing output file")
 	f.StringVar(&app.interlaceFile, flagInterlaceFile, app.interlaceFile, "interlace a spacer file (e.g. silence) between each input file")
-	f.StringVar(&app.outputFile, flagOutputFile, app.outputFile, "output filepath. Defaults to name of the folder of the first file provided")
+	f.StringVar(&app.outputPath, flagOutputFile, app.outputPath, "output filepath. Defaults to name of the folder of the first file provided")
 	f.StringVar(&app.applyTags, flagApplyTags, app.applyTags, "apply id3v2 tags to output file.\nTakes the format: 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
 	f.IntVar(&app.copyTags, flagCopyTags, app.copyTags, "copy the ID3 metadata tag from the n-th input file, starting with 1")
 
@@ -271,18 +273,18 @@ func getDiscoverableFile(fs aferox.Aferox, file string, noDiscovery bool, fileTy
 	return "", nil
 }
 
-func getOutputFile(fs aferox.Aferox, outputFile string, overwrite bool, candidate string) (string, error) {
-	if outputFile == "" {
-		outputFile = candidate
+func getOutputFile(fs aferox.Aferox, outputPath string, overwrite bool, candidate string) (string, error) {
+	if outputPath == "" {
+		outputPath = candidate
 	}
 
-	outputFile = fs.Abs(outputFile)
+	outputPath = fs.Abs(outputPath)
 
 	for {
-		info, err := fs.Stat(outputFile)
+		info, err := fs.Stat(outputPath)
 		if err != nil {
 			if errors.Is(err, fs2.ErrNotExist) {
-				return outputFile, nil
+				return outputPath, nil
 			}
 		}
 
@@ -292,15 +294,15 @@ func getOutputFile(fs aferox.Aferox, outputFile string, overwrite bool, candidat
 				name = candidate
 			}
 
-			outputFile = filepath.Join(outputFile, candidate)
+			outputPath = filepath.Join(outputPath, candidate)
 			continue
 		}
 
 		if !overwrite {
-			return "", ErrOutputFileExists
+			return "", fmt.Errorf("file: '%s': %w", outputPath, ErrOutputFileExists)
 		}
 
-		return outputFile, nil
+		return outputPath, nil
 	}
 }
 

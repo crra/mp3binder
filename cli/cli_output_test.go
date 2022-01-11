@@ -26,11 +26,13 @@ func TestOutputFileNotExisting(t *testing.T) {
 
 	a := &application{
 		fs:         aferox.NewAferox("/", fs),
-		outputFile: validOutputFile,
+		outputPath: validOutputFile,
 	}
 
 	err := a.args(nil, []string{"."})
-	assert.NoError(t, err)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "/"+validOutputFile, a.outputPath)
+	}
 }
 
 func TestOutputFileExistingNoOverwrite(t *testing.T) {
@@ -41,7 +43,7 @@ func TestOutputFileExistingNoOverwrite(t *testing.T) {
 
 	a := &application{
 		fs:         aferox.NewAferox("/", fs),
-		outputFile: validOutputFile,
+		outputPath: validOutputFile,
 	}
 
 	err := a.args(nil, []string{"."})
@@ -56,12 +58,14 @@ func TestOutputFileExistingOverwrite(t *testing.T) {
 
 	a := &application{
 		fs:         aferox.NewAferox("/", fs),
-		outputFile: validOutputFile,
+		outputPath: validOutputFile,
 		overwrite:  true,
 	}
 
 	err := a.args(nil, []string{"."})
-	assert.NoError(t, err)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "/"+validOutputFile, a.outputPath)
+	}
 }
 
 func TestAsOutputFile(t *testing.T) {
@@ -80,37 +84,41 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 	fs.MkdirAll("/"+sampleDirectory, 0755)
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)), []byte("out"), 0644)
 
 	for i, fixture := range []struct {
-		outputFile string
+		outputPath string
 		expected   string
 	}{
 		{
-			outputFile: "../" + sampleDirectory,
-			expected:   "/" + filepath.Join(sampleDirectory, sampleDirectory+".mp3"),
+			outputPath: "../" + sampleDirectory,
+			expected:   "/" + filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)),
 		},
 		{
-			outputFile: "/" + sampleDirectory,
-			expected:   "/" + filepath.Join(sampleDirectory, sampleDirectory+".mp3"),
+			outputPath: "/" + sampleDirectory,
+			expected:   "/" + filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)),
 		},
 		{
-			outputFile: ".",
-			expected:   "/" + sampleDirectory + ".mp3",
+			outputPath: ".",
+			expected:   "/" + asOutputFile(sampleDirectory),
 		},
 		{
-			outputFile: "",
-			expected:   "/" + sampleDirectory + ".mp3",
+			outputPath: "",
+			expected:   "/" + asOutputFile(sampleDirectory),
 		},
 	} {
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
 			a := &application{
 				fs:         aferox.NewAferox("/", fs),
-				outputFile: fixture.outputFile,
+				outputPath: fixture.outputPath,
+				overwrite:  true,
 			}
 
 			err := a.args(nil, []string{"../" + sampleDirectory})
 			if assert.NoError(t, err) {
-				assert.Equal(t, fixture.expected, a.outputFile)
+				if assert.Equal(t, fixture.expected, a.outputPath) {
+					assert.NotContains(t, a.mediaFiles, a.outputPath)
+				}
 			}
 		})
 	}
@@ -123,12 +131,11 @@ func TestOutputFileFromRootDirectory1(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
 
 	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		overwrite: true,
+		fs: aferox.NewAferox("/", fs),
 	}
 
 	err := a.args(nil, []string{"/"})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/root.mp3", a.outputFile)
+		assert.Equal(t, "/root.mp3", a.outputPath)
 	}
 }
