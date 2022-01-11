@@ -8,6 +8,7 @@ import (
 	fs2 "io/fs"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/crra/mp3binder/slice"
@@ -22,10 +23,9 @@ import (
 var (
 	ErrNoInput          = errors.New("no input files specified")
 	ErrAtLeastTwo       = errors.New("at least two files are required")
-	ErrIsDir            = errors.New("input file is directory")
 	ErrInvalidFile      = errors.New("invalid file")
 	ErrFileNotFound     = errors.New("file not found")
-	ErrOutputFileExists = errors.New("output file exists")
+	ErrOutputFileExists = errors.New("output file is already existing")
 )
 
 const (
