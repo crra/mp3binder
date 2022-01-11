@@ -7,5 +7,15 @@
   "gopls": {
     "gofumpt": true
   },
-  "cSpell.words": ["afero", "aferox", "bson", "logr", "stdr"]
+  "cSpell.words": [
+    "afero",
+    "aferox",
+    "bson",
+    "carolynvs",
+    "crra",
+    "logr",
+    "nomagic",
+    "stdr",
+    "tcopy"
+  ]
 }

@@ -184,17 +184,17 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]mediaFile, strin
 		return nil, "", err
 	}
 
-	// special case for root directories (e.g. removable media)
-	candidateName := value.OrDefaultStr(info.Name(), "root")
-
 	// regular file
 	if !info.IsDir() {
 		if isAcceptedMediaFile(arg, false) {
-			return []mediaFile{{path: arg, explicitlySet: true}}, candidateName, nil
+			return []mediaFile{{path: arg, explicitlySet: true}}, filepath.Base(filepath.Dir(arg)), nil
 		}
 
 		return nil, "", fmt.Errorf("media file '%s': %w", info.Name(), ErrInvalidFile)
 	}
+
+	// special case for root directories (e.g. removable media)
+	candidateName := value.OrDefaultStr(info.Name(), "root")
 
 	// files from a directory
 	dirListing, err := fs.ReadDir(arg)
@@ -327,29 +327,38 @@ func mediaFilePartitionStr(m mediaFile) string {
 	return partitionDiscovered
 }
 
-func removeDuplicatesIfSourceMixed(files []mediaFile) []string {
+func removeDuplicatesIfSourceMixed(files []mediaFile, outputCandidate string) []string {
 	if len(files) == 0 {
 		return []string{}
+	}
+
+	// remove output candidate if discovered
+	for i, f := range files {
+		if f.explicitlySet == false && f.path == outputCandidate {
+			copy(files[i:], files[i+1:])
+			files = files[:len(files)-1]
+			break
+		}
 	}
 
 	partition := slice.Partition(files, mediaFilePartitionStr)
 	explicitlySet, _ := partition[partitionExplicitlySet]
 	discovered, _ := partition[partitionDiscovered]
 
-	// if there are no partitions, just return the files
+	// if there is no partition, just return the files
 	if len(explicitlySet) == 0 || len(discovered) == 0 {
-		return slice.Map(files, func(m mediaFile) string { return m.path })
+		return slice.Map(files, slice.String[mediaFile])
 	}
 
 	// remove the explicitly set files from the discovered files
-	orderedFiles := slice.UnionButIntersectionFromB(discovered, explicitlySet, slice.PartitionResultUnwrap[mediaFile])
+	orderedFiles := slice.UnionButIntersectionFromB(discovered, explicitlySet, slice.String[slice.PartitionResult[mediaFile]])
 
 	// sort by the original index
 	sort.Slice(orderedFiles, func(p, q int) bool {
 		return orderedFiles[p].OriginalIndex < orderedFiles[q].OriginalIndex
 	})
 
-	return slice.Map(orderedFiles, slice.PartitionResultUnwrap[mediaFile])
+	return slice.Map(orderedFiles, slice.String[slice.PartitionResult[mediaFile]])
 }
 
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
@@ -359,7 +368,16 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	a.mediaFiles = removeDuplicatesIfSourceMixed(mediaFiles)
+	a.outputPath, err = getOutputFile(a.fs, a.outputPath, a.overwrite, asOutputFile(outputCandidateName))
+	if err != nil {
+		if errors.Is(err, ErrOutputFileExists) {
+			return fmt.Errorf("%w, use '--force' to overwrite", err)
+		}
+
+		return err
+	}
+
+	a.mediaFiles = removeDuplicatesIfSourceMixed(mediaFiles, a.outputPath)
 
 	if len(a.mediaFiles) == 0 {
 		return ErrNoInput
@@ -369,12 +387,16 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return ErrAtLeastTwo
 	}
 
-	a.coverFile, err = getDiscoverableFile(a.fs, a.coverFile, a.noDiscovery, "cover", isAcceptedCoverFile, coverFiles)
-	if err != nil {
-		return err
+	if a.debug {
+		padding := len(strconv.Itoa(len(a.mediaFiles)))
+
+		format := fmt.Sprintf("%%%[1]dd: %%s\n", padding)
+		for i, f := range a.mediaFiles {
+			fmt.Fprintf(a.status, format, i, f)
+		}
 	}
 
-	a.outputFile, err = getOutputFile(a.fs, a.outputFile, a.overwrite, asOutputFile(outputCandidateName))
+	a.coverFile, err = getDiscoverableFile(a.fs, a.coverFile, a.noDiscovery, "cover", isAcceptedCoverFile, coverFiles)
 	if err != nil {
 		return err
 	}
