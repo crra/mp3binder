@@ -104,8 +104,8 @@ func unCamel(s string) string {
 	return b.String()
 }
 
-func openFilesOnce(fs afero.Fs, files []string) ([]io.Reader, func(), error) {
-	input := make([]io.Reader, len(files))
+func openFilesOnce(fs afero.Fs, files []string) ([]io.ReadSeeker, func(), error) {
+	input := make([]io.ReadSeeker, len(files))
 	openedFiles := make(map[string]afero.File)
 
 	close := func() {

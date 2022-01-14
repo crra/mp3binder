@@ -16,7 +16,7 @@ const (
 type job struct {
 	context       context.Context
 	output        io.WriteSeeker
-	input         []io.Reader
+	input         []io.ReadSeeker
 	tag           *id3v2.Tag
 	stageObserver stageObserver
 	bindObserver  bindObserver
@@ -35,7 +35,7 @@ type (
 func discardingStageObserver(string, string) {}
 func discardingBindObserver(int)             {}
 
-func Bind(parent context.Context, output io.WriteSeeker, input []io.Reader, options ...Option) error {
+func Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...Option) error {
 	j := &job{
 		context:       parent,
 		output:        output,
@@ -93,6 +93,13 @@ func bind() (stage, string, jobProcessor) {
 
 		for fileIndex, reader := range j.input {
 			j.bindObserver(fileIndex)
+
+			// because intput reders are opened once, and possible
+			// read more then once, the seek cursor is reset to the beginning
+			// of the stream.
+			if _, err := reader.Seek(0, io.SeekCurrent); err != nil {
+				return err
+			}
 
 			for i := 0; true; i++ {
 				frame := mp3lib.NextFrame(reader)
