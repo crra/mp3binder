@@ -22,15 +22,6 @@ const (
 	invalidFileName2 = "invalidSampleFile2.mp33"
 )
 
-func TestNoParameters(t *testing.T) {
-	a := &application{
-		fs: aferox.NewAferox("/", afero.NewMemMapFs()),
-	}
-
-	err := a.args(nil, []string{})
-	assert.ErrorIs(t, err, ErrNoInput)
-}
-
 func TestDirectoryWithNoFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
@@ -106,7 +97,7 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 			t.Parallel()
 			fs := afero.NewMemMapFs()
 			for _, n := range f {
-				afero.WriteFile(fs, "/"+n, []byte("1"), 0644)
+				afero.WriteFile(fs, "/"+n, []byte(""), 0644)
 			}
 
 			a := &application{
@@ -117,6 +108,21 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 			err := a.args(nil, []string{"."})
 			assert.NoError(t, err)
 		})
+	}
+}
+
+func TestNoParametersDefaultsToDirectory(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, []byte(""), 0644)
+	afero.WriteFile(fs, "/"+validFileName2, []byte(""), 0644)
+
+	a := &application{
+		fs: aferox.NewAferox("/", fs),
+	}
+
+	err := a.args(nil, []string{})
+	if assert.NoError(t, err) {
+		assert.Equal(t, 2, len(a.mediaFiles))
 	}
 }
 
