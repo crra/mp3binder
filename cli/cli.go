@@ -37,7 +37,7 @@ const (
 var (
 	outputFileExtension = ".mp3"
 	mediaFileExtensions = []string{".mp3"}
-	coverFileExtensions = []string{".jpg", ".png"}
+	coverFileExtensions = []string{".jpg", ".jpeg", ".png"}
 	coverFileNames      = []string{"cover", "folder", "album"}
 	coverFiles          = slice.ConcatStr(coverFileNames, coverFileExtensions)
 	interlaceFiles      = []string{"interlace.mp3", "_interlace.mp3"}

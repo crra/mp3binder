@@ -52,7 +52,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		}
 	}
 
-	a.coverFile, err = getDiscoverableFile(a.fs, a.coverFile, a.noDiscovery, "cover", isAcceptedCoverFile, coverFiles)
+	a.coverFile, a.coverFileMimeType, err = lookupMimeType(getDiscoverableFile(a.fs, a.coverFile, a.noDiscovery, "cover", isAcceptedCoverFile, coverFiles))
 	if err != nil {
 		return err
 	}
@@ -61,8 +61,6 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		if a.verbose {
 			fmt.Fprintf(a.status, "The following file be used as cover: '%s'\n", a.coverFile)
 		}
-
-		a.coverFileMimeType = getMimeTypeForExtension(filepath.Ext(a.coverFile))
 	}
 
 	a.interlaceFile, err = getDiscoverableFile(a.fs, a.interlaceFile, a.noDiscovery, "interlace", isAcceptedInterlaceFile, interlaceFiles)
@@ -106,11 +104,11 @@ func (a *application) args(c *cobra.Command, args []string) error {
 // isAcceptedMediaFile indicates if a file is accepted for joining.
 func isAcceptedMediaFile(path string, skipInterlaceFiles bool) bool {
 	// ignore the magic interlace files
-	if skipInterlaceFiles && slice.Contains(interlaceFiles, filepath.Base(path)) {
+	if skipInterlaceFiles && slice.Contains(interlaceFiles, strings.ToLower(filepath.Base(path))) {
 		return false
 	}
 
-	return slice.Contains(mediaFileExtensions, filepath.Ext(path))
+	return slice.Contains(mediaFileExtensions, strings.ToLower(filepath.Ext(path)))
 }
 
 // getMediaFilesFromArguments takes the program arguments and either accepts the argument as a file or if the argument
@@ -185,12 +183,22 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]mediaFile, strin
 
 // isAcceptedCoverFile returns true if the provided path points to a valid cover file.
 func isAcceptedCoverFile(path string) bool {
-	return slice.Contains(coverFileExtensions, filepath.Ext(path))
+	return slice.Contains(coverFileExtensions, strings.ToLower(filepath.Ext(path)))
 }
 
 // isAcceptedCoverFile returns true if the provided path points to a valid interlace file.
 func isAcceptedInterlaceFile(path string) bool {
-	return slice.Contains(mediaFileExtensions, filepath.Ext(path))
+	return slice.Contains(mediaFileExtensions, strings.ToLower(filepath.Ext(path)))
+}
+
+// lookupMimeType accepts the returns of a 'filename/error' function and
+// annotates the result with the mime type of the 'filename'.
+func lookupMimeType(name string, err error) (string, string, error) {
+	if err != nil {
+		return name, "", err
+	}
+
+	return name, getMimeTypeOfImageByExtension(filepath.Ext(name)), nil
 }
 
 func getDiscoverableFile(fs aferox.Aferox, file string, noDiscovery bool, fileType string, accept func(string) bool, wellKnownFiles []string) (string, error) {
@@ -271,7 +279,7 @@ func getOutputFile(fs aferox.Aferox, outputPath string, overwrite bool, candidat
 }
 
 func asOutputFile(fileName string) string {
-	if filepath.Ext(fileName) != outputFileExtension {
+	if strings.ToLower(filepath.Ext(fileName)) != outputFileExtension {
 		fileName += outputFileExtension
 	}
 
@@ -325,11 +333,11 @@ func removeDuplicatesIfSourceMixed(files []mediaFile, outputCandidate string) []
 	return slice.Map(orderedFiles, slice.String[slice.PartitionResult[mediaFile]])
 }
 
-func getMimeTypeForExtension(ext string) string {
+func getMimeTypeOfImageByExtension(ext string) string {
 	switch strings.ToLower(ext) {
 	default:
 		fallthrough
-	case ".jpg":
+	case ".jpg", ".jpeg":
 		return "image/jpeg"
 	case ".png":
 		return "image/png"

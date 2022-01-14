@@ -4,6 +4,8 @@ package cli
 //       the code is already generic, but the tests are not.
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/carolynvs/aferox"
@@ -61,18 +63,28 @@ func TestInterlaceFileIsDir(t *testing.T) {
 }
 
 func TestValidInterlaceFile(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
-	afero.WriteFile(fs, "/"+validInterlaceFile, []byte("interlace"), 0644)
+	for i, f := range []string{
+		validInterlaceFile,
+		strings.ToUpper(validInterlaceFile),
+	} {
+		f := f // pin
+		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
+			t.Parallel()
 
-	a := &application{
-		fs:            aferox.NewAferox("/", fs),
-		interlaceFile: validInterlaceFile,
+			fs := afero.NewMemMapFs()
+			afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
+			afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+			afero.WriteFile(fs, "/"+f, []byte("interlace"), 0644)
+
+			a := &application{
+				fs:            aferox.NewAferox("/", fs),
+				interlaceFile: f,
+			}
+
+			err := a.args(nil, []string{"."})
+			assert.NoError(t, err)
+		})
 	}
-
-	err := a.args(nil, []string{"."})
-	assert.NoError(t, err)
 }
 
 func TestDiscoverInterlaceFile(t *testing.T) {
