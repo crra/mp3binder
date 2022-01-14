@@ -20,8 +20,8 @@ const (
 func TestNonExistingCoverFile(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
@@ -35,8 +35,8 @@ func TestNonExistingCoverFile(t *testing.T) {
 func TestInvalidCoverFile(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+invalidCoverFile, []byte("cover"), 0644)
 
 	a := &application{
@@ -51,8 +51,8 @@ func TestInvalidCoverFile(t *testing.T) {
 func TestCoverFileIsDir(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	fs.MkdirAll("/"+validCoverFile1, 0755)
 
 	a := &application{
@@ -67,8 +67,8 @@ func TestCoverFileIsDir(t *testing.T) {
 func TestValidCoverFile(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
 	for _, f := range []string{
 		validCoverFile1,
@@ -93,8 +93,8 @@ func TestValidCoverFile(t *testing.T) {
 func TestDiscoverCoverFile(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validCoverFile1, []byte("cover"), 0644)
 
 	a := &application{
@@ -110,8 +110,8 @@ func TestDiscoverCoverFile(t *testing.T) {
 func TestNoCoverFileDiscovery(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validCoverFile1, []byte("cover"), 0644)
 
 	a := &application{
@@ -128,8 +128,8 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 func TestDiscoverCoverFileUppercased(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+strings.ToUpper(validCoverFile1), []byte("cover"), 0644)
 
 	a := &application{
