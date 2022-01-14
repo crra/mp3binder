@@ -86,7 +86,7 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), []byte("2"), 0644)
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)), []byte("out"), 0644)
 
-	for i, fixture := range []struct {
+	for i, f := range []struct {
 		outputPath string
 		expected   string
 	}{
@@ -107,16 +107,18 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 			expected:   "/" + asOutputFile(sampleDirectory),
 		},
 	} {
+		f := f // pin
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
+			t.Parallel()
 			a := &application{
 				fs:         aferox.NewAferox("/", fs),
-				outputPath: fixture.outputPath,
+				outputPath: f.outputPath,
 				overwrite:  true,
 			}
 
 			err := a.args(nil, []string{"../" + sampleDirectory})
 			if assert.NoError(t, err) {
-				if assert.Equal(t, fixture.expected, a.outputPath) {
+				if assert.Equal(t, f.expected, a.outputPath) {
 					assert.NotContains(t, a.mediaFiles, a.outputPath)
 				}
 			}

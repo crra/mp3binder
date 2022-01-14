@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/carolynvs/aferox"
@@ -89,17 +91,33 @@ func TestDirectoryWithOneFile(t *testing.T) {
 }
 
 func TestDirectoryWithTwoFiles(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("1"), 0644)
+	for i, f := range [][]string{
+		{
+			validFileName1,
+			validFileName2,
+		},
+		{
+			strings.ToUpper(validFileName1),
+			strings.ToUpper(validFileName2),
+		},
+	} {
+		f := f // pin
+		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
+			t.Parallel()
+			fs := afero.NewMemMapFs()
+			for _, n := range f {
+				afero.WriteFile(fs, "/"+n, []byte("1"), 0644)
+			}
 
-	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		overwrite: true,
+			a := &application{
+				fs:        aferox.NewAferox("/", fs),
+				overwrite: true,
+			}
+
+			err := a.args(nil, []string{"."})
+			assert.NoError(t, err)
+		})
 	}
-
-	err := a.args(nil, []string{"."})
-	assert.NoError(t, err)
 }
 
 func TestDirectoryWithTwoFilesAndIgnoredMagicInterlaceFile(t *testing.T) {
