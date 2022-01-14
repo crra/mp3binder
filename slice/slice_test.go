@@ -45,7 +45,7 @@ func TestInterlaceString(t *testing.T) {
 			index:    1,
 		},
 	} {
-		f := f
+		f := f // pin
 		t.Run(f.name, func(t *testing.T) {
 			t.Parallel()
 			interlaced := Interlace(f.slice, f.element)
@@ -96,7 +96,7 @@ func TestInterlaceBool(t *testing.T) {
 			index:    1,
 		},
 	} {
-		f := f
+		f := f // pin
 		t.Run(f.name, func(t *testing.T) {
 			t.Parallel()
 			interlaced := Interlace(f.slice, f.element)
