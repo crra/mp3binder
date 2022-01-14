@@ -20,6 +20,7 @@ type job struct {
 	tag           *id3v2.Tag
 	stageObserver stageObserver
 	bindObserver  bindObserver
+	tagObserver   tagObserver
 }
 
 type namedJobProcessor struct {
@@ -30,19 +31,23 @@ type namedJobProcessor struct {
 type (
 	stageObserver func(string, string)
 	bindObserver  func(int)
+	tagObserver   func(string, error)
 )
 
 func discardingStageObserver(string, string) {}
 func discardingBindObserver(int)             {}
+func discardingTagObserver(string, error)    {}
 
 func Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...Option) error {
 	j := &job{
-		context:       parent,
-		output:        output,
-		input:         input,
-		tag:           id3v2.NewEmptyTag(),
+		context: parent,
+		output:  output,
+		input:   input,
+		tag:     id3v2.NewEmptyTag(),
+
 		stageObserver: discardingStageObserver,
 		bindObserver:  discardingBindObserver,
+		tagObserver:   discardingTagObserver,
 	}
 
 	jobProcessors := make(map[stage][]namedJobProcessor)

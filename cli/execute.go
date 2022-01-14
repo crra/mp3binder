@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -54,6 +55,15 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 
 		options = append(options, mp3binder.BindObserver(func(index int) {
 			fmt.Fprintf(a.status, "Binding: '%s'\n", filepath.Base(a.mediaFiles[index]))
+		}))
+
+		options = append(options, mp3binder.TagObserver(func(tag string, err error) {
+			switch {
+			case errors.Is(err, mp3binder.ErrNonStandardTag):
+				fmt.Fprintf(a.status, "Warning: tag '%s' with value '%s' is not a well-known tag, ignoring\n", tag, a.tags[tag])
+			default:
+				fmt.Fprintf(a.status, "Adding tag: '%s' with value '%s'\n", tag, a.tags[tag])
+			}
 		}))
 	}
 
