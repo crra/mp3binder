@@ -32,7 +32,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	a.mediaFiles = removeDuplicatesIfSourceMixed(mediaFiles, a.outputPath)
+	a.mediaFiles = filterMediaFiles(mediaFiles, a.outputPath)
 
 	if len(a.mediaFiles) == 0 {
 		return ErrNoInput
@@ -162,7 +162,7 @@ func getMediaFilesFromArgument(fs aferox.Aferox, arg string) ([]mediaFile, strin
 	}
 
 	// special case for root directories (e.g. removable media)
-	candidateName := value.OrDefaultStr(info.Name(), "root")
+	candidateName := value.OrDefaultStr(info.Name(), rootDirectoryName)
 
 	// files from a directory
 	dirListing, err := fs.ReadDir(arg)
@@ -305,14 +305,16 @@ func mediaFilePartitionStr(m mediaFile) string {
 	return partitionDiscovered
 }
 
-func removeDuplicatesIfSourceMixed(files []mediaFile, outputCandidate string) []string {
+// filterMediaFiles performs various filters (e.g. removing duplicates when the sources:
+// directory, command line arguments are mixed).
+func filterMediaFiles(files []mediaFile, outputFile string) []string {
 	if len(files) == 0 {
 		return []string{}
 	}
 
-	// remove output candidate if discovered
+	// the output file shall never be an input file
 	for i, f := range files {
-		if f.explicitlySet == false && f.path == outputCandidate {
+		if f.path == outputFile {
 			copy(files[i:], files[i+1:])
 			files = files[:len(files)-1]
 			break
