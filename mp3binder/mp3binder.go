@@ -1,84 +1,127 @@
 package mp3binder
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/bogem/id3v2"
 	"github.com/dmulholl/mp3lib"
 )
 
 const (
-	defaultTrackNumber           = "1"
-	TagCover                     = "APIC"
-	TagTrack                     = "TRCK"
-	coverType                    = "Front cover"
 	emptyInfoXingFrameSize int64 = 209
 )
 
-type Cover struct {
-	MimeType string
-	Reader   io.Reader
-	Force    bool
+type job struct {
+	context       context.Context
+	output        io.WriteSeeker
+	input         []io.Reader
+	tag           *id3v2.Tag
+	stageObserver stageObserver
+	bindObserver  bindObserver
 }
 
-type ProgressCallbackFn func(index int)
+type namedJobProcessor struct {
+	name      string
+	processor jobProcessor
+}
 
-func Bind(
-	out io.WriteSeeker,
-	tagTemplateReader io.Reader,
-	tags map[string]string,
-	cover *Cover,
-	progressCallback ProgressCallbackFn,
-	in ...io.Reader,
-) error {
-	if err := writeID3Tags(out, tagTemplateReader, tags, cover); err != nil {
-		return err
+type (
+	stageObserver func(string, string)
+	bindObserver  func(int)
+)
+
+func discardingStageObserver(string, string) {}
+func discardingBindObserver(int)             {}
+
+func Bind(parent context.Context, output io.WriteSeeker, input []io.Reader, options ...Option) error {
+	j := &job{
+		context:       parent,
+		output:        output,
+		input:         input,
+		tag:           id3v2.NewEmptyTag(),
+		stageObserver: discardingStageObserver,
+		bindObserver:  discardingBindObserver,
 	}
 
-	var (
-		bitrates    = make(map[int]struct{})
-		framesCount uint32
-		bytesCount  uint32
-	)
+	jobProcessors := make(map[stage][]namedJobProcessor)
 
-	if _, err := out.Write(make([]byte, emptyInfoXingFrameSize)); err != nil {
-		return fmt.Errorf("can not write, %v", err)
+	options = append(options, bind)
+	options = append(options, writeMetadata)
+
+	for _, o := range options {
+		stage, name, processor := o()
+		jobProcessors[stage] = append(jobProcessors[stage], namedJobProcessor{
+			name:      name,
+			processor: processor,
+		})
 	}
 
-	for fileIndex, reader := range in {
-		if progressCallback != nil {
-			progressCallback(fileIndex)
+	// process all stages
+	for s := stage(0); s < stageLastElement; s++ {
+		for _, p := range jobProcessors[s] {
+			j.stageObserver(s.String(), p.name)
+			if err := p.processor(j); err != nil {
+				return err
+			}
 		}
-
-		for i := 0; true; i++ {
-			frame := mp3lib.NextFrame(reader)
-			if frame == nil {
-				break
-			}
-
-			if i == 0 && (mp3lib.IsXingHeader(frame) || mp3lib.IsVbriHeader(frame)) {
-				continue
-			}
-
-			bitrates[frame.BitRate] = struct{}{}
-
-			if _, err := out.Write(frame.RawBytes); err != nil {
-				return fmt.Errorf("can not write, %v", err)
-			}
-
-			framesCount++
-
-			bytesCount += uint32(len(frame.RawBytes))
-		}
-	}
-
-	if err := writeBitrateHeader(out, framesCount, bytesCount, len(bitrates) > 1); err != nil {
-		return err
 	}
 
 	return nil
+}
+
+func writeMetadata() (stage, string, jobProcessor) {
+	return stageWriteMetadata, "writing metadata", func(j *job) error {
+		if _, err := j.tag.WriteTo(j.output); err != nil {
+			return err
+		}
+
+		return nil
+	}
+}
+
+func bind() (stage, string, jobProcessor) {
+	return stageBind, "Binding", func(j *job) error {
+		if _, err := j.output.Write(make([]byte, emptyInfoXingFrameSize)); err != nil {
+			return err
+		}
+
+		var bytesCount uint32
+		var framesCount uint32
+		bitrates := make(map[int]struct{})
+
+		for fileIndex, reader := range j.input {
+			j.bindObserver(fileIndex)
+
+			for i := 0; true; i++ {
+				frame := mp3lib.NextFrame(reader)
+				if frame == nil {
+					break
+				}
+
+				if i == 0 && (mp3lib.IsXingHeader(frame) || mp3lib.IsVbriHeader(frame)) {
+					continue
+				}
+
+				bitrates[frame.BitRate] = struct{}{}
+
+				if _, err := j.output.Write(frame.RawBytes); err != nil {
+					return err
+				}
+
+				framesCount++
+
+				bytesCount += uint32(len(frame.RawBytes))
+			}
+		}
+
+		if err := writeBitrateHeader(j.output, framesCount, bytesCount, len(bitrates) > 1); err != nil {
+			return err
+		}
+
+		return nil
+	}
 }
 
 func writeBitrateHeader(out io.WriteSeeker, framesCount, bytesCount uint32, multipleBitrates bool) error {
@@ -125,68 +168,4 @@ func getSideInfoSize(frame *mp3lib.MP3Frame) int {
 	}
 
 	return size
-}
-
-func writeID3Tags(out io.Writer, tagTemplateReader io.Reader, tags map[string]string, cover *Cover) error {
-	var (
-		tag    = id3v2.NewEmptyTag()
-		frames = make(map[string]id3v2.Framer)
-	)
-
-	if tagTemplateReader != nil {
-		var (
-			tagFromTemplate *id3v2.Tag
-			err             error
-		)
-
-		if tagFromTemplate, err = id3v2.ParseReader(tagTemplateReader, id3v2.Options{Parse: true}); err != nil {
-			return err
-		}
-
-		for id := range tagFromTemplate.AllFrames() {
-			frames[id] = tagFromTemplate.GetLastFrame(id)
-		}
-
-		frames[TagTrack] = &id3v2.TextFrame{Encoding: tagFromTemplate.DefaultEncoding(), Text: defaultTrackNumber}
-	}
-
-	for id, value := range tags {
-		frames[id] = &id3v2.TextFrame{Encoding: tag.DefaultEncoding(), Text: value}
-	}
-
-	if cover != nil {
-		_, ok := frames[TagCover]
-		if !ok || cover.Force {
-			var (
-				data []byte
-				err  error
-			)
-
-			if data, err = ioutil.ReadAll(cover.Reader); err != nil {
-				return err
-			}
-
-			frames[TagCover] = id3v2.PictureFrame{
-				Encoding:    id3v2.EncodingUTF8,
-				MimeType:    cover.MimeType,
-				PictureType: id3v2.PTFrontCover,
-				Description: coverType,
-				Picture:     data,
-			}
-		}
-	}
-
-	if len(frames) == 0 {
-		return nil
-	}
-
-	for id, f := range frames {
-		tag.AddFrame(id, f)
-	}
-
-	if _, err := tag.WriteTo(out); err != nil {
-		return err
-	}
-
-	return nil
 }
