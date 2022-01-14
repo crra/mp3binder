@@ -74,7 +74,7 @@ tasks:
       - go test -cover -race ./...
 
   build:
-    desc: Build all binary for the current platform.
+    desc: Build the binary for the current architecture.
     deps:
       - clean
       - tests
