@@ -41,6 +41,8 @@ var (
 	coverFileNames      = []string{"cover", "folder", "album"}
 	coverFiles          = slice.ConcatStr(coverFileNames, coverFileExtensions)
 	interlaceFiles      = []string{"interlace.mp3", "_interlace.mp3"}
+
+	rootDirectoryName = "root" + outputFileExtension
 )
 
 // Service describes the cli service.
