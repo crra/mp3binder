@@ -39,7 +39,6 @@ func ActionObserver(f stageObserver) Option {
 		const action = "stage observer"
 		return stageInit, action, func(j *job) error {
 			j.stageObserver = f
-			j.stageObserver(stageInit.String(), action)
 
 			return nil
 		}

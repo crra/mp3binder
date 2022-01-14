@@ -66,7 +66,9 @@ func Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, 
 	// process all stages
 	for s := stage(0); s < stageLastElement; s++ {
 		for _, p := range jobProcessors[s] {
-			j.stageObserver(s.String(), p.name)
+			if s != stageInit {
+				j.stageObserver(s.String(), p.name)
+			}
 			if err := p.processor(j); err != nil {
 				return err
 			}
