@@ -99,10 +99,9 @@ func bind() (stage, string, jobProcessor) {
 		for fileIndex, reader := range j.input {
 			j.bindObserver(fileIndex)
 
-			// because intput reders are opened once, and possible
-			// read more then once, the seek cursor is reset to the beginning
-			// of the stream.
-			if _, err := reader.Seek(0, io.SeekCurrent); err != nil {
+			// because intput is read more then once, the seek cursor is reset
+			// to the beginning of the stream.
+			if _, err := reader.Seek(0, io.SeekStart); err != nil {
 				return err
 			}
 
