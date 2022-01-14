@@ -19,6 +19,7 @@ const (
 )
 
 func TestNonExistingInterlaceFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -33,6 +34,7 @@ func TestNonExistingInterlaceFile(t *testing.T) {
 }
 
 func TestInvalidInterlaceFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -48,6 +50,7 @@ func TestInvalidInterlaceFile(t *testing.T) {
 }
 
 func TestInterlaceFileIsDir(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -63,6 +66,7 @@ func TestInterlaceFileIsDir(t *testing.T) {
 }
 
 func TestValidInterlaceFile(t *testing.T) {
+	t.Parallel()
 	for i, f := range []string{
 		validInterlaceFile,
 		strings.ToUpper(validInterlaceFile),
@@ -88,6 +92,7 @@ func TestValidInterlaceFile(t *testing.T) {
 }
 
 func TestDiscoverInterlaceFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -104,6 +109,7 @@ func TestDiscoverInterlaceFile(t *testing.T) {
 }
 
 func TestNoInterlaceFileDiscovery(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)

@@ -23,6 +23,7 @@ const (
 )
 
 func TestDirectoryWithNoFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	a := &application{
@@ -34,6 +35,7 @@ func TestDirectoryWithNoFile(t *testing.T) {
 }
 
 func TestDirectoryWithNonExistingDirectory(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	a := &application{
@@ -45,6 +47,7 @@ func TestDirectoryWithNonExistingDirectory(t *testing.T) {
 }
 
 func TestDirectoryWithNonExistingFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 
@@ -57,6 +60,7 @@ func TestDirectoryWithNonExistingFile(t *testing.T) {
 }
 
 func TestDirectoryWithNoValidFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+invalidFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+invalidFileName2, []byte("2"), 0644)
@@ -70,6 +74,7 @@ func TestDirectoryWithNoValidFile(t *testing.T) {
 }
 
 func TestDirectoryWithOneFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 
@@ -82,6 +87,7 @@ func TestDirectoryWithOneFile(t *testing.T) {
 }
 
 func TestDirectoryWithTwoFiles(t *testing.T) {
+	t.Parallel()
 	for i, f := range [][]string{
 		{
 			validFileName1,
@@ -112,6 +118,7 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 }
 
 func TestNoParametersDefaultsToDirectory(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte(""), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte(""), 0644)
@@ -127,6 +134,7 @@ func TestNoParametersDefaultsToDirectory(t *testing.T) {
 }
 
 func TestDirectoryWithTwoFilesAndIgnoredMagicInterlaceFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -145,6 +153,7 @@ func TestDirectoryWithTwoFilesAndIgnoredMagicInterlaceFile(t *testing.T) {
 }
 
 func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -164,7 +173,9 @@ func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) 
 }
 
 func TestSubDirectoryWithTwoFiles(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
+	fs.MkdirAll("/"+sampleDirectory, 0755)
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), []byte("1"), 0644)
 
@@ -177,6 +188,7 @@ func TestSubDirectoryWithTwoFiles(t *testing.T) {
 }
 
 func TestOneFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 
@@ -189,6 +201,7 @@ func TestOneFile(t *testing.T) {
 }
 
 func TestOneInvalidFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+invalidFileName1, []byte("1"), 0644)
 
@@ -201,6 +214,7 @@ func TestOneInvalidFile(t *testing.T) {
 }
 
 func TestTwoFiles(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -215,6 +229,7 @@ func TestTwoFiles(t *testing.T) {
 }
 
 func TestFileNotFound(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	a := &application{
@@ -225,7 +240,8 @@ func TestFileNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, ErrFileNotFound)
 }
 
-func TestOneFileAndADirectory(t *testing.T) {
+func TestOneFileAndDirectory(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	fs.MkdirAll("/"+validFileName2, 0755)
@@ -239,6 +255,7 @@ func TestOneFileAndADirectory(t *testing.T) {
 }
 
 func TestFilesAndDirectoryUnique(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -255,6 +272,7 @@ func TestFilesAndDirectoryUnique(t *testing.T) {
 }
 
 func TestFilesAndDirectoryUniqueWithExtraFromDirectoryDirectoryFirst(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -275,7 +293,8 @@ func TestFilesAndDirectoryUniqueWithExtraFromDirectoryDirectoryFirst(t *testing.
 	}
 }
 
-func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirectoryLast(t *testing.T) {
+func TestFilesAndDirectoryUniqueWithExtraFromDirectoryLast(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -297,6 +316,7 @@ func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirectoryLast(t *testing.T
 }
 
 func TestFilesAndDirectoryUniqueButKeepDuplicatesFromArg(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)

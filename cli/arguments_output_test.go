@@ -20,6 +20,7 @@ func fileNameWithoutExtension(fileName string) string {
 }
 
 func TestOutputFileNotExisting(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -36,6 +37,7 @@ func TestOutputFileNotExisting(t *testing.T) {
 }
 
 func TestOutputFileExistingNoOverwrite(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -51,6 +53,7 @@ func TestOutputFileExistingNoOverwrite(t *testing.T) {
 }
 
 func TestOutputFileExistingOverwrite(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
 	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
@@ -69,6 +72,7 @@ func TestOutputFileExistingOverwrite(t *testing.T) {
 }
 
 func TestAsOutputFile(t *testing.T) {
+	t.Parallel()
 	const (
 		file      = "file"
 		extension = ".mp3"
@@ -80,6 +84,7 @@ func TestAsOutputFile(t *testing.T) {
 }
 
 func TestOutputFileFromSampleDirectory1(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	fs.MkdirAll("/"+sampleDirectory, 0755)
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), []byte("1"), 0644)
@@ -127,6 +132,7 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 }
 
 func TestOutputFileFromRootDirectory1(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	fs.MkdirAll("/"+sampleDirectory, 0755)
 	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)

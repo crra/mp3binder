@@ -9,6 +9,7 @@ import (
 const arbitraryInterlaceElement = "_"
 
 func TestInterlaceString(t *testing.T) {
+	t.Parallel()
 	for _, f := range []struct {
 		name     string
 		slice    []string
@@ -60,6 +61,7 @@ func TestInterlaceString(t *testing.T) {
 }
 
 func TestInterlaceBool(t *testing.T) {
+	t.Parallel()
 	for _, f := range []struct {
 		name     string
 		slice    []bool
