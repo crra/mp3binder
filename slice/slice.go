@@ -4,6 +4,10 @@ import (
 	"strings"
 )
 
+const (
+	interlaceScaleFactor = 2
+)
+
 func Contains[K comparable](haystack []K, needle K) bool {
 	for _, v := range haystack {
 		if v == needle {
@@ -132,4 +136,32 @@ func UnionButIntersectionFromB[T Stringer, K comparable](a, b []T, fn func(T) K)
 	}
 
 	return union
+}
+
+// Interlace works similar to `strings.Join`, it takes a slice and adds an interlace between each element.
+func Interlace[T any](l []T, interlace T) []T {
+	// interlacing makes sense for more than one elements
+	if len(l) <= 1 {
+		return l
+	}
+
+	// -1 because there is no interlace at the end
+	interlaced := make([]T, len(l)*interlaceScaleFactor-1)
+	interlaced[0] = l[0]
+
+	for i, e := range l[1:] {
+		eI := i*interlaceScaleFactor + 1
+		interlaced[eI] = interlace
+		interlaced[eI+1] = e
+	}
+
+	return interlaced
+}
+
+func IndexAfterInterlace(interlacedLength, oldIndex int) int {
+	if interlacedLength <= 1 {
+		return oldIndex
+	}
+
+	return oldIndex * interlaceScaleFactor
 }
