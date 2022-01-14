@@ -12,8 +12,8 @@ func TestCopyIndex(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	numberOfFiles := 2
-	afero.WriteFile(fs, "/"+validFileName1, []byte("1"), 0644)
-	afero.WriteFile(fs, "/"+validFileName2, []byte("2"), 0644)
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
 	for i := 1; i <= numberOfFiles+1; i++ {
 		a := &application{
