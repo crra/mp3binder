@@ -117,6 +117,12 @@ func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]mediaFile, s
 	var files []mediaFile
 	var outputFileCandidate string
 
+	// no argument is provided, use the current directory and try to bind
+	// the files that are listed here
+	if len(args) == 0 {
+		args = append(args, ".")
+	}
+
 	for _, arg := range args {
 		filesFromParameter, candidate, err := getMediaFilesFromArgument(fs, arg)
 		if err != nil {
