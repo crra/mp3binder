@@ -7,6 +7,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	t.Parallel()
 	singleValue := map[string]string{"key": "value"}
 	twoValues := map[string]string{"key1": "value1", "key2": "value2"}
 	threeValues := map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"}
