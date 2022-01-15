@@ -59,7 +59,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 
 	if a.coverFile != "" {
 		if a.verbose {
-			fmt.Fprintf(a.status, "The following file be used as cover: '%s'\n", a.coverFile)
+			fmt.Fprintf(a.status, "The following file will be used as cover: '%s'\n", a.coverFile)
 		}
 	}
 
@@ -69,7 +69,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 	}
 
 	if a.verbose && a.interlaceFile != "" {
-		fmt.Fprintf(a.status, "The following file be used as interlace: '%s'\n", a.interlaceFile)
+		fmt.Fprintf(a.status, "The following file will be used as interlace: '%s'\n", a.interlaceFile)
 	}
 
 	if a.copyTagsFromIndex > 0 {
