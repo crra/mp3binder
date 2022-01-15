@@ -324,16 +324,31 @@ func filterMediaFiles(files []mediaFile, outputFile string) []string {
 		return []string{}
 	}
 
-	// the output file shall never be an input file
-	for i, f := range files {
-		if f.path == outputFile {
-			copy(files[i:], files[i+1:])
-			files = files[:len(files)-1]
-			break
+	seenFiles := make(map[string]struct{})
+	preparedFiles := make([]mediaFile, 0, len(files))
+
+	for _, f := range files {
+		_, seen := seenFiles[f.path]
+		switch {
+		case f.path == outputFile:
+			// the output file shall never be an input file
+			continue
+		case seen:
+			// Allow duplicates for explicitly set files, but
+			// filter duplicates for indirectly set files.
+			// If a file was added explicitly and implicitly,
+			// it will be filtered by partitioning (see after
+			// this block)
+			if !f.explicitlySet {
+				continue
+			}
 		}
+
+		seenFiles[f.path] = struct{}{}
+		preparedFiles = append(preparedFiles, f)
 	}
 
-	partition := slice.Partition(files, mediaFilePartitionStr)
+	partition := slice.Partition(preparedFiles, mediaFilePartitionStr)
 	explicitlySet, _ := partition[partitionExplicitlySet]
 	discovered, _ := partition[partitionDiscovered]
 

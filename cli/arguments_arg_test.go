@@ -308,12 +308,56 @@ func TestFilesAndDirectoryUniqueWithExtraFromDirectoryLast(t *testing.T) {
 		overwrite: true,
 	}
 
-	err := a.args(nil, []string{validFileName1, validFileName2, "."})
+	err := a.args(nil, []string{validFileName2, validFileName1, "."})
 	if assert.NoError(t, err) {
 		assert.Equal(t, []string{
-			"/" + validFileName1,
 			"/" + validFileName2,
+			"/" + validFileName1,
 			"/" + validFileName3,
+		}, a.mediaFiles)
+	}
+}
+
+func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirst(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName3, defaultFileContent, 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{".", validFileName2, validFileName1})
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"/" + validFileName3,
+			"/" + validFileName2,
+			"/" + validFileName1,
+		}, a.mediaFiles)
+	}
+}
+
+func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirstAndLast(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName3, defaultFileContent, 0644)
+
+	a := &application{
+		fs:        aferox.NewAferox("/", fs),
+		overwrite: true,
+	}
+
+	err := a.args(nil, []string{".", validFileName2, validFileName1, "."})
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"/" + validFileName3,
+			"/" + validFileName2,
+			"/" + validFileName1,
 		}, a.mediaFiles)
 	}
 }
