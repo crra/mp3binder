@@ -36,6 +36,23 @@ func TestOutputFileNotExisting(t *testing.T) {
 	}
 }
 
+func TestOutputFileMissingExtension(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+
+	a := &application{
+		fs:         aferox.NewAferox("/", fs),
+		outputPath: fileNameWithoutExtension(validOutputFile),
+	}
+
+	err := a.args(nil, []string{"."})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "/"+validOutputFile, a.outputPath)
+	}
+}
+
 func TestOutputFileExistingNoOverwrite(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()

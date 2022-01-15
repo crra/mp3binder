@@ -23,7 +23,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	a.outputPath, err = getOutputFile(a.fs, a.outputPath, a.overwrite, asOutputFile(outputCandidateName))
+	a.outputPath, err = getOutputFile(a.fs, a.outputPath, a.overwrite, outputCandidateName)
 	if err != nil {
 		if errors.Is(err, ErrOutputFileExists) {
 			return fmt.Errorf("%w, use '--force' to overwrite", err)
@@ -134,7 +134,7 @@ func getMediaFilesFromArguments(fs aferox.Aferox, args []string) ([]mediaFile, s
 		}
 
 		if outputFileCandidate == "" && candidate != "" {
-			outputFileCandidate = candidate
+			outputFileCandidate = asOutputFile(candidate)
 		}
 		files = append(files, filesFromParameter...)
 	}
@@ -259,10 +259,18 @@ func getOutputFile(fs aferox.Aferox, outputPath string, overwrite bool, candidat
 	outputPath = fs.Abs(outputPath)
 
 	for {
+		// Don't enforce the output file extension on the
+		// first run the path may point to a directory where the
+		// output file should be stored in.
 		info, err := fs.Stat(outputPath)
 		if err != nil {
 			if errors.Is(err, fs2.ErrNotExist) {
-				return outputPath, nil
+				if hasOutputFileExtension(outputPath) {
+					return outputPath, nil
+				}
+
+				outputPath = asOutputFile(outputPath)
+				continue
 			}
 		}
 
@@ -272,7 +280,7 @@ func getOutputFile(fs aferox.Aferox, outputPath string, overwrite bool, candidat
 				name = candidate
 			}
 
-			outputPath = filepath.Join(outputPath, candidate)
+			outputPath = asOutputFile(filepath.Join(outputPath, asOutputFile(name)))
 			continue
 		}
 
@@ -284,8 +292,12 @@ func getOutputFile(fs aferox.Aferox, outputPath string, overwrite bool, candidat
 	}
 }
 
+func hasOutputFileExtension(fileName string) bool {
+	return strings.ToLower(filepath.Ext(fileName)) == outputFileExtension
+}
+
 func asOutputFile(fileName string) string {
-	if strings.ToLower(filepath.Ext(fileName)) != outputFileExtension {
+	if !hasOutputFileExtension(fileName) {
 		fileName += outputFileExtension
 	}
 
