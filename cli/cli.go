@@ -103,10 +103,11 @@ func New(parent context.Context, name, version string, log logr.Logger, status i
 	}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("%s one.mp3 two.mp3 three.mp3", name),
+		Use:     fmt.Sprintf("%s file1.mp3 file2.mp3", name),
+		Example: fmt.Sprintf("Calling '%[1]s' with no parameters is equivalent to: '%[1]s *.mp3 --nomagic'", name),
 		Version: version,
 		Short:   fmt.Sprintf("%s joins multiple mp3 files into one", name),
-		Long:    fmt.Sprintf("%s is a simple command line utility for concatenating/join MP3 files without re-encoding.", name),
+		Long:    fmt.Sprintf("%s is a simple command line utility for concatenating/joining MP3 files without re-encoding.", name),
 
 		SilenceErrors: true,
 		SilenceUsage:  true,
