@@ -354,7 +354,7 @@ func filterMediaFiles(files []mediaFile, outputFile string) []string {
 
 	// if there is no partition, just return the files
 	if len(explicitlySet) == 0 || len(discovered) == 0 {
-		return slice.Map(files, slice.String[mediaFile])
+		return slice.Map(preparedFiles, slice.String[mediaFile])
 	}
 
 	// remove the explicitly set files from the discovered files
