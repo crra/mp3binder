@@ -3,7 +3,7 @@ module github.com/crra/mp3binder
 go 1.18
 
 require (
-	github.com/bogem/id3v2 v1.2.0
+	github.com/bogem/id3v2/v2 v2.1.2
 	github.com/carolynvs/aferox v0.3.0
 	github.com/dmulholl/mp3lib v1.0.0
 	github.com/go-logr/logr v1.2.2
