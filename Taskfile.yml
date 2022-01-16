@@ -13,10 +13,19 @@ vars:
     sh: git describe --tags --always | sed 's/-/+/' | sed 's/^v//'
 
 tasks:
+  setup:
+    desc: Install required (go) tools
+    cmds:
+      - go install golang.org/x/tools/cmd/stringer
+
   clean:
     desc: Cleans temp files and folders
     cmds:
       - rm -rf {{.FOLDER_DIST}}
+
+  stringer:
+    cmds:
+      - go generate ./...
 
   build-all:
     desc: Build the binaries for multiple architectures.
