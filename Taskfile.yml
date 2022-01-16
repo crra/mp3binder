@@ -25,7 +25,7 @@ tasks:
       - tests
     cmds:
       # macOS intel
-      - task: build-each
+      - task: build-for
         vars:
           {
             NAME: "{{.MP3BINDER_NAME}}",
@@ -34,8 +34,10 @@ tasks:
             GOARCH: "amd64",
             EXTENSION: "",
           }
+      - task: zip
+        vars: { NAME: "darwin_amd64" }
       # macOS Apple silicon
-      - task: build-each
+      - task: build-for
         vars:
           {
             NAME: "{{.MP3BINDER_NAME}}",
@@ -44,12 +46,15 @@ tasks:
             GOARCH: "arm64",
             EXTENSION: "",
           }
+      - task: zip
+        vars: { NAME: "darwin_arm64" }
       - '{{if eq OS "darwin"}}
         mkdir -p {{.FOLDER_DIST}}/darwin_universal &&
-        lipo -create -output {{.FOLDER_DIST}}/darwin_universal/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_amd64/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_arm64/{{.MP3BINDER_NAME}}
+        lipo -create -output {{.FOLDER_DIST}}/darwin_universal/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_amd64/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_arm64/{{.MP3BINDER_NAME}} &&
+        cd {{.FOLDER_DIST}}/darwin_universal/ && zip -r "../darwin_universal.zip" .
         {{end}}'
       # linux 64
-      - task: build-each
+      - task: build-for
         vars:
           {
             NAME: "{{.MP3BINDER_NAME}}",
@@ -58,8 +63,10 @@ tasks:
             GOARCH: "amd64",
             EXTENSION: "",
           }
+      - task: zip
+        vars: { NAME: "linux_amd64" }
       # windows 64
-      - task: build-each
+      - task: build-for
         vars:
           {
             NAME: "{{.MP3BINDER_NAME}}",
@@ -68,6 +75,8 @@ tasks:
             GOARCH: "amd64",
             EXTENSION: ".exe",
           }
+      - task: zip
+        vars: { NAME: "windows_amd64" }
   tests:
     desc: Perform all tests
     cmds:
@@ -79,7 +88,7 @@ tasks:
       - clean
       - tests
     cmds:
-      - task: build-each
+      - task: build-for
         vars:
           {
             NAME: "{{.MP3BINDER_NAME}}",
@@ -88,8 +97,22 @@ tasks:
             GOARCH: "{{ARCH}}",
             EXTENSION: "{{exeExt}}",
           }
+      - task: zip
+        vars: { NAME: "{{OS}}_{{ARCH}}" }
 
-  build-each:
+  zip:
+    vars:
+      FOLDER: "{{.FOLDER_DIST}}/{{.NAME}}"
+    summary: Zips the folder
+    cmds:
+      - cd "${FOLDER}" && zip -r "../${NAME}.zip" .
+    generates:
+      - "{{.FOLDER_DIST}}/{{.NAME}}.zip"
+    env:
+      NAME: "{{.NAME}}"
+      FOLDER: "{{.FOLDER}}"
+
+  build-for:
     vars:
       FOLDER: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}"
       OUTPUT: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}/{{.NAME}}{{.EXTENSION}}"
