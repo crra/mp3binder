@@ -72,3 +72,37 @@ Building is always more complex then just calling `build` (e.g. adding version i
 For example cross compilation for multiple platforms is achieved with `task build-all`, and for the current platform with `task build`. Plain go would be: `go build .\cmd\mp3builder\` without build time optimizations and settings (e.g. version information).
 
 The `Taskfile.yml` gives good hints which commands and options are executed if the developer don't want to use `task`. In the end 'Task' it's just a simple task runner (collection of commands).
+
+## Golang 1.18
+
+As of today (January, 2022), golang 1.18 with generics is not yet released. `gotip` installs the latest go build (which includes 1.18):
+
+[Source](https://gist.github.com/nikgalushko/e1b5c85c64653dd554a7a904bbef4eee):
+
+### Install gotip
+
+```
+go install golang.org/dl/gotip@latest
+gotip download
+```
+
+### Install latest gopls
+
+```
+mkdir /tmp/gopls && cd "$_"
+gotip mod init gopls-unstable
+gotip get golang.org/x/tools/gopls@master golang.org/x/tools@master
+gotip install golang.org/x/tools/gopls
+```
+
+### Configure VSCode/Codium
+
+1. View > Command Palette
+2. Go: choose Go environment
+3. select gotip
+
+### Adapt you path
+
+VSCode/Codium does not always update the path to use `gotip` for the `go` command. `go version` reports the version string. If an older version is shown, the path could be defined as:
+
+> export set PATH=$(go env GOPATH)/bin:~/sdk/gotip/bin:$PATH
