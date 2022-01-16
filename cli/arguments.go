@@ -46,7 +46,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		padding := len(strconv.Itoa(len(a.mediaFiles)))
 
 		fmt.Fprintf(a.status, "The following files will be 'bound' as: '%s'\n", a.outputPath)
-		format := fmt.Sprintf("> %%%[1]dd: %%s\n", padding)
+		format := fmt.Sprintf("- %%%[1]dd: %%s\n", padding)
 		for i, f := range a.mediaFiles {
 			fmt.Fprintf(a.status, format, i+1, f)
 		}
@@ -73,15 +73,12 @@ func (a *application) args(c *cobra.Command, args []string) error {
 	}
 
 	if a.copyTagsFromIndex > 0 {
-		// zero based
-		a.copyTagsFromIndex -= 1
-
-		if a.copyTagsFromIndex >= len(a.mediaFiles) {
-			return fmt.Errorf("index: '%d': %w", a.copyTagsFromIndex+1, ErrInvalidIndex)
+		if a.copyTagsFromIndex-1 >= len(a.mediaFiles) {
+			return fmt.Errorf("index: '%d': %w", a.copyTagsFromIndex, ErrInvalidIndex)
 		}
 
 		if a.verbose {
-			fmt.Fprintf(a.status, "The id3tags will be copied from file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex])
+			fmt.Fprintf(a.status, "The id3tags will be copied from file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
 		}
 	}
 
@@ -93,7 +90,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		if a.verbose {
 			fmt.Fprintln(a.status, "The following id3tags will be applied:")
 			for k := range a.tags {
-				fmt.Fprintf(a.status, "> %s: %s\n", k, a.tags[k])
+				fmt.Fprintf(a.status, "- %s: %s\n", k, a.tags[k])
 			}
 		}
 	}

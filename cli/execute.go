@@ -19,13 +19,13 @@ import (
 func (a *application) run(c *cobra.Command, _ []string) error {
 	if a.interlaceFile != "" {
 		a.mediaFiles = slice.Interlace(a.mediaFiles, a.interlaceFile)
-		a.copyTagsFromIndex = slice.IndexAfterInterlace(len(a.mediaFiles), a.copyTagsFromIndex)
+		a.copyTagsFromIndex = slice.IndexAfterInterlace(len(a.mediaFiles), a.copyTagsFromIndex-1)
 
 		if a.verbose {
 			padding := len(strconv.Itoa(len(a.mediaFiles)))
 
 			fmt.Fprintln(a.status, "Files to bind after applying the interlace file:")
-			format := fmt.Sprintf("> %%%[1]dd: %%s\n", padding)
+			format := fmt.Sprintf("- %%%[1]dd: %%s\n", padding)
 			for i, f := range a.mediaFiles {
 				fmt.Fprintf(a.status, format, i+1, f)
 			}
@@ -40,7 +40,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 	defer output.Close()
 
 	// inputs
-	input, close, err := openFilesOnce(a.fs, a.mediaFiles)
+	inputs, close, err := openFilesOnce(a.fs, a.mediaFiles)
 	defer close()
 	if err != nil {
 		return err
@@ -50,20 +50,30 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 
 	if a.verbose {
 		options = append(options, mp3binder.ActionObserver(func(stage string, action string) {
-			fmt.Fprintf(a.status, "Processing stage: '%s' and action: '%s'\n", unCamel(stage), action)
+			fmt.Fprintf(a.status, "# Processing stage: '%s' and action: '%s'\n", unCamel(stage), action)
 		}))
 
 		options = append(options, mp3binder.BindObserver(func(index int) {
-			fmt.Fprintf(a.status, "Binding: '%s'\n", filepath.Base(a.mediaFiles[index]))
+			fmt.Fprintf(a.status, "- Binding: '%s'\n", filepath.Base(a.mediaFiles[index]))
 		}))
 
-		options = append(options, mp3binder.TagObserver(func(tag string, err error) {
-			switch {
-			case errors.Is(err, mp3binder.ErrNonStandardTag):
-				fmt.Fprintf(a.status, "Warning: tag '%s' with value '%s' is not a well-known tag, ignoring\n", tag, a.tags[tag])
-			default:
-				fmt.Fprintf(a.status, "Adding tag: '%s' with value '%s'\n", tag, a.tags[tag])
+		options = append(options, mp3binder.TagObserver(func(tag, value string, err error) {
+			if err != nil {
+				switch {
+				case errors.Is(err, mp3binder.ErrTagSkipCopying):
+					fmt.Fprintf(a.status, "Info: skipping tag from copy task: '%s'\n", tag)
+				case errors.Is(err, mp3binder.ErrNoTagsInTemplate):
+					fmt.Fprintf(a.status, "! Warning: there are not id3v2 tags in file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
+				case errors.Is(err, mp3binder.ErrTagNonStandard):
+					fmt.Fprintf(a.status, "! Warning: tag '%s' with value '%s' is not a well-known tag, ignoring\n", tag, a.tags[tag])
+				default:
+					fmt.Fprintf(a.status, "! Unhandled warning during tag processing: %v\n", err)
+				}
+
+				return
 			}
+
+			fmt.Fprintf(a.status, "- Adding tag: '%s' with value '%s'\n", tag, value)
 		}))
 	}
 
@@ -80,7 +90,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 
 	// copy metadata
 	if a.copyTagsFromIndex > 0 {
-		options = append(options, mp3binder.CopyMetadataFrom(a.copyTagsFromIndex))
+		options = append(options, mp3binder.CopyMetadataFrom(a.copyTagsFromIndex-1))
 	}
 
 	// apply metadata
@@ -89,7 +99,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 	}
 
 	// bind
-	err = mp3binder.Bind(a.parent, output, input, options...)
+	err = mp3binder.Bind(a.parent, output, inputs, options...)
 	if err != nil {
 		_ = a.fs.Remove(a.outputPath)
 		return err

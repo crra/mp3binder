@@ -1,9 +1,11 @@
 package mp3binder
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/bogem/id3v2/v2"
 	"github.com/dmulholl/mp3lib"
@@ -11,16 +13,19 @@ import (
 
 const (
 	emptyInfoXingFrameSize int64 = 209
+	tagTitle                     = "TIT2"
 )
 
 type job struct {
-	context       context.Context
-	output        io.WriteSeeker
-	input         []io.ReadSeeker
-	tag           *id3v2.Tag
-	stageObserver stageObserver
-	bindObserver  bindObserver
-	tagObserver   tagObserver
+	context        context.Context
+	output         io.WriteSeeker
+	inputs         []io.ReadSeeker
+	tag            *id3v2.Tag
+	metadata       []*id3v2.Tag
+	inputDurations []time.Duration
+	stageObserver  stageObserver
+	bindObserver   bindObserver
+	tagObserver    tagObserver
 }
 
 type namedJobProcessor struct {
@@ -31,19 +36,22 @@ type namedJobProcessor struct {
 type (
 	stageObserver func(string, string)
 	bindObserver  func(int)
-	tagObserver   func(string, error)
+	tagObserver   func(string, string, error)
 )
 
-func discardingStageObserver(string, string) {}
-func discardingBindObserver(int)             {}
-func discardingTagObserver(string, error)    {}
+func discardingStageObserver(string, string)      {}
+func discardingBindObserver(int)                  {}
+func discardingTagObserver(string, string, error) {}
 
 func Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...Option) error {
 	j := &job{
 		context: parent,
 		output:  output,
-		input:   input,
-		tag:     id3v2.NewEmptyTag(),
+		inputs:  input,
+
+		tag:            id3v2.NewEmptyTag(),
+		inputDurations: make([]time.Duration, len(input)),
+		metadata:       make([]*id3v2.Tag, len(input)),
 
 		stageObserver: discardingStageObserver,
 		bindObserver:  discardingBindObserver,
@@ -80,6 +88,31 @@ func Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, 
 
 func writeMetadata() (stage, string, jobProcessor) {
 	return stageWriteMetadata, "writing metadata", func(j *job) error {
+		var start time.Duration
+
+		for i, m := range j.metadata {
+			title := fmt.Sprintf("Chapter: %d", i+1)
+			intputTitle := m.GetTextFrame(tagTitle).Text
+			if intputTitle != "" {
+				title = fmt.Sprintf("%s: %s", title, intputTitle)
+			}
+
+			end := start + j.inputDurations[i]
+			j.tagObserver(fmt.Sprintf("Chapter: %d from '%s' to '%s'", i+1, start.Round(time.Second), end.Round(time.Second)), title, nil)
+
+			j.tag.AddChapterFrame(id3v2.ChapterFrame{
+				ElementID: fmt.Sprintf("chap-%d", i),
+				StartTime: start,
+				EndTime:   end,
+				Title: &id3v2.TextFrame{
+					Encoding: id3v2.EncodingUTF8,
+					Text:     title,
+				},
+			})
+
+			start = end
+		}
+
 		if _, err := j.tag.WriteTo(j.output); err != nil {
 			return err
 		}
@@ -96,9 +129,11 @@ func bind() (stage, string, jobProcessor) {
 
 		var bytesCount uint32
 		var framesCount uint32
-		bitrates := make(map[int]struct{})
+		var lastBitrate int
+		var multipleBitrates bool
 
-		for fileIndex, reader := range j.input {
+		for fileIndex, reader := range j.inputs {
+			_ = lastBitrate // linter: if there are no frames in the file, this value will never
 			j.bindObserver(fileIndex)
 
 			// because intput is read more then once, the seek cursor is reset
@@ -107,29 +142,61 @@ func bind() (stage, string, jobProcessor) {
 				return err
 			}
 
+			if j.metadata[fileIndex] == nil {
+				j.metadata[fileIndex] = id3v2.NewEmptyTag()
+			}
+
 			for i := 0; true; i++ {
-				frame := mp3lib.NextFrame(reader)
-				if frame == nil {
+				obj := mp3lib.NextObject(reader)
+				if obj == nil {
 					break
 				}
 
-				if i == 0 && (mp3lib.IsXingHeader(frame) || mp3lib.IsVbriHeader(frame)) {
+				switch obj := obj.(type) {
+				case *mp3lib.MP3Frame:
+					if i == 0 && (mp3lib.IsXingHeader(obj) || mp3lib.IsVbriHeader(obj)) {
+						continue
+					}
+
+					if lastBitrate == 0 {
+						lastBitrate = obj.BitRate
+					}
+
+					if !multipleBitrates && lastBitrate != obj.BitRate {
+						multipleBitrates = true
+					}
+
+					if _, err := j.output.Write(obj.RawBytes); err != nil {
+						return err
+					}
+
+					j.inputDurations[fileIndex] += duration(obj)
+
+					framesCount++
+
+					bytesCount += uint32(len(obj.RawBytes))
+
+				case *mp3lib.ID3v2Tag:
+					tag, err := id3v2.ParseReader(bytes.NewReader(obj.RawBytes), id3v2.Options{Parse: true})
+					if err != nil {
+						return err
+					}
+
+					for id := range tag.AllFrames() {
+						if id == tagIdTrack {
+							continue
+						}
+
+						j.metadata[fileIndex].AddFrame(id, tag.GetLastFrame(id))
+					}
+
+				default:
 					continue
 				}
-
-				bitrates[frame.BitRate] = struct{}{}
-
-				if _, err := j.output.Write(frame.RawBytes); err != nil {
-					return err
-				}
-
-				framesCount++
-
-				bytesCount += uint32(len(frame.RawBytes))
 			}
 		}
 
-		if err := writeBitrateHeader(j.output, framesCount, bytesCount, len(bitrates) > 1); err != nil {
+		if err := writeBitrateHeader(j.output, framesCount, bytesCount, multipleBitrates); err != nil {
 			return err
 		}
 
@@ -159,6 +226,10 @@ func writeBitrateHeader(out io.WriteSeeker, framesCount, bytesCount uint32, mult
 	}
 
 	return nil
+}
+
+func duration(frame *mp3lib.MP3Frame) time.Duration {
+	return time.Duration(int64(float64(time.Millisecond) * (1000 / float64(frame.SamplingRate)) * float64(frame.SampleCount)))
 }
 
 func getSideInfoSize(frame *mp3lib.MP3Frame) int {

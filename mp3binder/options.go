@@ -3,6 +3,7 @@ package mp3binder
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/bogem/id3v2/v2"
@@ -13,12 +14,15 @@ type stage int
 const (
 	stageInit stage = iota
 
-	stageCopyMetadata
-	stageAfterCopyMetadata
-	stageBeforeWriteMetadata
-	stageWriteMetadata
+	stageReadMetadata
 
 	stageBind
+
+	stageCopyMetadata
+	stageAfterCopyMetadata
+
+	stageBeforeWriteMetadata
+	stageWriteMetadata
 
 	// https://stackoverflow.com/questions/64178176/how-to-create-an-enum-and-iterate-over-it
 	stageLastElement
@@ -27,6 +31,12 @@ const (
 const (
 	defaultTrackNumber = "1"
 	tagIdTrack         = "TRCK"
+)
+
+var (
+	ErrTagNonStandard   = errors.New("non-standard tag")
+	ErrNoTagsInTemplate = errors.New("no tags in template")
+	ErrTagSkipCopying   = errors.New("ignoring tag for copying")
 )
 
 type (
@@ -68,25 +78,37 @@ func TagObserver(f tagObserver) Option {
 func CopyMetadataFrom(index int) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageCopyMetadata, "copy metadata", func(j *job) error {
-			tagFromTemplate, err := id3v2.ParseReader(j.input[index], id3v2.Options{Parse: true})
-			if err != nil {
-				return err
+			template := j.metadata[index]
+			if !template.HasFrames() {
+				j.tagObserver("", "", ErrNoTagsInTemplate)
+				return nil
 			}
 
-			for id := range tagFromTemplate.AllFrames() {
-				if id == tagIdTrack {
-					continue
-				}
+			for id := range template.AllFrames() {
+				for _, f := range template.GetFrames(id) {
+					switch ff := f.(type) {
+					case id3v2.TextFrame:
+						if id == tagIdTrack {
+							j.tagObserver(id, "", ErrTagSkipCopying)
+							continue
+						}
 
-				j.tag.AddFrame(id, tagFromTemplate.GetLastFrame(id))
+						j.tagObserver(id, ff.Text, nil)
+					case id3v2.PictureFrame:
+						j.tagObserver(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
+					case id3v2.ChapterFrame:
+						j.tagObserver(id, "", ErrTagSkipCopying)
+						continue
+					}
+
+					j.tag.AddFrame(id, f)
+				}
 			}
 
 			return nil
 		}
 	}
 }
-
-var ErrNonStandardTag = errors.New("non-standard tag")
 
 func ApplyMetadata(tags map[string]string) Option {
 	knownTags := make(map[string]bool, len(id3v2.V23CommonIDs))
@@ -99,15 +121,17 @@ func ApplyMetadata(tags map[string]string) Option {
 			for id, value := range tags {
 				_, exist := knownTags[id]
 				if !exist {
-					j.tagObserver(id, ErrNonStandardTag)
+					j.tagObserver(id, "", ErrTagNonStandard)
 					continue
 				}
 
+				j.tagObserver(id, value, nil)
 				j.tag.AddFrame(id, &id3v2.TextFrame{Encoding: j.tag.DefaultEncoding(), Text: value})
 			}
 
 			if _, ok := tags[tagIdTrack]; !ok {
 				j.tag.AddFrame(tagIdTrack, &id3v2.TextFrame{Encoding: j.tag.DefaultEncoding(), Text: defaultTrackNumber})
+				j.tagObserver(tagIdTrack, defaultTrackNumber, nil)
 			}
 
 			return nil

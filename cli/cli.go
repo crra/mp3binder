@@ -70,7 +70,7 @@ type application struct {
 	interlaceFile     string
 	outputPath        string
 	applyTags         string
-	copyTagsFromIndex int
+	copyTagsFromIndex int // NOTE: starts on '1' rathen than '0'
 	mediaFiles        []string
 	tags              map[string]string
 

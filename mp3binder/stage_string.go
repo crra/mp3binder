@@ -9,17 +9,18 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[stageInit-0]
-	_ = x[stageCopyMetadata-1]
-	_ = x[stageAfterCopyMetadata-2]
-	_ = x[stageBeforeWriteMetadata-3]
-	_ = x[stageWriteMetadata-4]
-	_ = x[stageBind-5]
-	_ = x[stageLastElement-6]
+	_ = x[stageReadMetadata-1]
+	_ = x[stageBind-2]
+	_ = x[stageCopyMetadata-3]
+	_ = x[stageAfterCopyMetadata-4]
+	_ = x[stageBeforeWriteMetadata-5]
+	_ = x[stageWriteMetadata-6]
+	_ = x[stageLastElement-7]
 }
 
-const _stage_name = "InitCopyMetadataAfterCopyMetadataBeforeWriteMetadataWriteMetadataBindLastElement"
+const _stage_name = "InitReadMetadataBindCopyMetadataAfterCopyMetadataBeforeWriteMetadataWriteMetadataLastElement"
 
-var _stage_index = [...]uint8{0, 4, 16, 33, 52, 65, 69, 80}
+var _stage_index = [...]uint8{0, 4, 16, 20, 32, 49, 68, 81, 92}
 
 func (i stage) String() string {
 	if i < 0 || i >= stage(len(_stage_index)-1) {
