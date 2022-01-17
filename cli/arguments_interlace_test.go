@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	validInterlaceFile   = "_interlace.mp3"
 	invalidInterlaceFile = "_"
 )
 
@@ -38,11 +37,11 @@ func TestInvalidInterlaceFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+invalidInterlaceFile, []byte("interlace"), 0644)
+	afero.WriteFile(fs, "/"+invalidInterlaceFile, defaultFileContent, 0644)
 
 	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: invalidInterlaceFile,
+		fs:            aferox.NewAferox("/", fs),
+		interlaceFile: invalidInterlaceFile,
 	}
 
 	err := a.args(nil, []string{"."})
@@ -54,11 +53,11 @@ func TestInterlaceFileIsDir(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	fs.MkdirAll("/"+validInterlaceFile, 0755)
+	fs.MkdirAll("/"+validInterlaceFile1, 0755)
 
 	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: validInterlaceFile,
+		fs:            aferox.NewAferox("/", fs),
+		interlaceFile: validInterlaceFile1,
 	}
 
 	err := a.args(nil, []string{"."})
@@ -68,8 +67,8 @@ func TestInterlaceFileIsDir(t *testing.T) {
 func TestValidInterlaceFile(t *testing.T) {
 	t.Parallel()
 	for i, f := range []string{
-		validInterlaceFile,
-		strings.ToUpper(validInterlaceFile),
+		validInterlaceFile1,
+		strings.ToUpper(validInterlaceFile1),
 	} {
 		f := f // pin
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
@@ -78,7 +77,7 @@ func TestValidInterlaceFile(t *testing.T) {
 			fs := afero.NewMemMapFs()
 			afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 			afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-			afero.WriteFile(fs, "/"+f, []byte("interlace"), 0644)
+			afero.WriteFile(fs, "/"+f, defaultFileContent, 0644)
 
 			a := &application{
 				fs:            aferox.NewAferox("/", fs),
@@ -96,7 +95,7 @@ func TestDiscoverInterlaceFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validInterlaceFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile1, defaultFileContent, 0644)
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),
@@ -104,7 +103,7 @@ func TestDiscoverInterlaceFile(t *testing.T) {
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/"+validInterlaceFile, a.interlaceFile)
+		assert.Equal(t, "/"+validInterlaceFile1, a.interlaceFile)
 	}
 }
 
@@ -113,7 +112,7 @@ func TestNoInterlaceFileDiscovery(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validInterlaceFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile1, defaultFileContent, 0644)
 
 	a := &application{
 		fs:          aferox.NewAferox("/", fs),

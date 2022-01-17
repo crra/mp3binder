@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,9 +19,33 @@ const (
 
 	invalidFileName1 = "invalidSampleFile1.mp33"
 	invalidFileName2 = "invalidSampleFile2.mp33"
+
+	validInterlaceFile1 = "interlace.mp3"
+	validInterlaceFile2 = "_interlace.mp3"
 )
 
-var defaultFileContent = []byte("")
+var defaultFileContent = []byte{}
+
+func filesToMediaFiles(files []string, path string) []string {
+	mediaFiles := make([]string, len(files))
+	for i, f := range files {
+		mediaFiles[i] = path + f
+	}
+
+	return mediaFiles
+}
+
+func makeFiles(fs afero.Fs, files []string, path string) []string {
+	for _, f := range files {
+		afero.WriteFile(fs, path+f, defaultFileContent, 0644)
+	}
+
+	return filesToMediaFiles(files, path)
+}
+
+func withTwoValidFiles(fs afero.Fs, path string) []string {
+	return makeFiles(fs, []string{validFileName1, validFileName2}, path)
+}
 
 func TestDirectoryWithNoFile(t *testing.T) {
 	t.Parallel()
@@ -104,9 +127,7 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
 			t.Parallel()
 			fs := afero.NewMemMapFs()
-			for _, n := range f {
-				afero.WriteFile(fs, "/"+n, defaultFileContent, 0644)
-			}
+			mediaFiles := makeFiles(fs, f, "/")
 
 			a := &application{
 				fs:        aferox.NewAferox("/", fs),
@@ -114,7 +135,9 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 			}
 
 			err := a.args(nil, []string{"."})
-			assert.NoError(t, err)
+			if assert.NoError(t, err) {
+				assert.Equal(t, mediaFiles, a.mediaFiles)
+			}
 		})
 	}
 }
@@ -122,8 +145,7 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 func TestNoParametersDefaultsToDirectory(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	mediaFiles := withTwoValidFiles(fs, "/")
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),
@@ -131,26 +153,7 @@ func TestNoParametersDefaultsToDirectory(t *testing.T) {
 
 	err := a.args(nil, []string{})
 	if assert.NoError(t, err) {
-		assert.Equal(t, 2, len(a.mediaFiles))
-	}
-}
-
-func TestDirectoryWithTwoFilesAndIgnoredMagicInterlaceFile(t *testing.T) {
-	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/interlace.mp3", []byte("interlace"), 0644)
-	afero.WriteFile(fs, "/_interlace.mp3", []byte("interlace"), 0644)
-
-	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		overwrite: true,
-	}
-
-	err := a.args(nil, []string{"."})
-	if assert.NoError(t, err) {
-		assert.Equal(t, 2, len(a.mediaFiles))
+		assert.Equal(t, mediaFiles, a.mediaFiles)
 	}
 }
 
@@ -159,8 +162,8 @@ func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) 
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/interlace.mp3", []byte("interlace"), 0644)
-	afero.WriteFile(fs, "/_interlace.mp3", []byte("interlace"), 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile1, defaultFileContent, 0644)
+	afero.WriteFile(fs, "/"+validInterlaceFile2, defaultFileContent, 0644)
 
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
@@ -168,9 +171,12 @@ func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) 
 	}
 
 	files := []string{validFileName1, "interlace.mp3", validFileName2, "interlace.mp3", "_interlace.mp3"}
+	mediaFiles := filesToMediaFiles(files, "/")
+
 	err := a.args(nil, files)
 	if assert.NoError(t, err) {
 		assert.Equal(t, len(files), len(a.mediaFiles))
+		assert.Equal(t, mediaFiles, a.mediaFiles)
 	}
 }
 
@@ -178,8 +184,7 @@ func TestSubDirectoryWithTwoFiles(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	fs.MkdirAll("/"+sampleDirectory, 0755)
-	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), defaultFileContent, 0644)
+	withTwoValidFiles(fs, "/"+sampleDirectory+"/")
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),
@@ -218,8 +223,7 @@ func TestOneInvalidFile(t *testing.T) {
 func TestTwoFiles(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	mediaFiles := withTwoValidFiles(fs, "/")
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),
@@ -227,7 +231,7 @@ func TestTwoFiles(t *testing.T) {
 
 	err := a.args(nil, []string{validFileName1, validFileName2})
 	if assert.NoError(t, err) {
-		assert.Equal(t, []string{"/" + validFileName1, "/" + validFileName2}, a.mediaFiles)
+		assert.Equal(t, mediaFiles, a.mediaFiles)
 	}
 }
 
@@ -257,11 +261,10 @@ func TestOneFileAndDirectory(t *testing.T) {
 	assert.Error(t, err, ErrAtLeastTwo)
 }
 
-func TestFilesAndDirectoryUnique(t *testing.T) {
+func TestFilesAndDirectoryNoDuplicates(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	mediaFiles := withTwoValidFiles(fs, "/")
 
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
@@ -270,7 +273,7 @@ func TestFilesAndDirectoryUnique(t *testing.T) {
 
 	err := a.args(nil, []string{".", validFileName1, validFileName2})
 	if assert.NoError(t, err) {
-		assert.Equal(t, []string{"/" + validFileName1, "/" + validFileName2}, a.mediaFiles)
+		assert.Equal(t, mediaFiles, a.mediaFiles)
 	}
 }
 

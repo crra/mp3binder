@@ -37,7 +37,7 @@ func TestInvalidCoverFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+invalidCoverFile, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+invalidCoverFile, defaultFileContent, 0644)
 
 	a := &application{
 		fs:        aferox.NewAferox("/", fs),
@@ -78,7 +78,7 @@ func TestValidCoverFile(t *testing.T) {
 		strings.ToUpper(validCoverFile2),
 		strings.ToUpper(validCoverFile3),
 	} {
-		afero.WriteFile(fs, "/"+f, []byte("cover"), 0644)
+		afero.WriteFile(fs, "/"+f, defaultFileContent, 0644)
 
 		a := &application{
 			fs:        aferox.NewAferox("/", fs),
@@ -95,7 +95,7 @@ func TestDiscoverCoverFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validCoverFile1, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validCoverFile1, defaultFileContent, 0644)
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),
@@ -112,7 +112,7 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validCoverFile1, []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+validCoverFile1, defaultFileContent, 0644)
 
 	a := &application{
 		fs:          aferox.NewAferox("/", fs),
@@ -130,7 +130,7 @@ func TestDiscoverCoverFileUppercased(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+strings.ToUpper(validCoverFile1), []byte("cover"), 0644)
+	afero.WriteFile(fs, "/"+strings.ToUpper(validCoverFile1), defaultFileContent, 0644)
 
 	a := &application{
 		fs: aferox.NewAferox("/", fs),

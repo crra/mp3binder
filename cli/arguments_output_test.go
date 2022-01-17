@@ -58,7 +58,7 @@ func TestOutputFileExistingNoOverwrite(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validOutputFile, []byte("out"), 0644)
+	afero.WriteFile(fs, "/"+validOutputFile, defaultFileContent, 0644)
 
 	a := &application{
 		fs:         aferox.NewAferox("/", fs),
@@ -74,7 +74,7 @@ func TestOutputFileExistingOverwrite(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validOutputFile, []byte("out"), 0644)
+	afero.WriteFile(fs, "/"+validOutputFile, defaultFileContent, 0644)
 
 	a := &application{
 		fs:         aferox.NewAferox("/", fs),
