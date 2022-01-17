@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/crra/mp3binder/mp3binder"
 	"github.com/crra/mp3binder/slice"
 
 	"github.com/carolynvs/aferox"
@@ -51,9 +52,14 @@ type Service interface {
 	Execute() error
 }
 
+type (
+	binder func(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...mp3binder.Option) error
+)
+
 type application struct {
 	name    string
 	version string
+	binder  binder
 
 	fs     aferox.Aferox
 	cwd    string
@@ -91,11 +97,12 @@ func (m mediaFile) String() string {
 	return m.path
 }
 
-func New(parent context.Context, name, version string, log logr.Logger, status io.Writer, fs afero.Fs, cwd string) Service {
+func New(parent context.Context, name, version string, log logr.Logger, status io.Writer, fs afero.Fs, cwd string, binder binder) Service {
 	app := &application{
 		parent:  parent,
 		name:    name,
 		version: version,
+		binder:  binder,
 		log:     log,
 		status:  status,
 		fs:      aferox.NewAferox(cwd, fs),

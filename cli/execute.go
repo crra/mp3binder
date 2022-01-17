@@ -99,7 +99,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 	}
 
 	// bind
-	err = mp3binder.Bind(a.parent, output, inputs, options...)
+	err = a.binder(a.parent, output, inputs, options...)
 	if err != nil {
 		_ = a.fs.Remove(a.outputPath)
 		return err

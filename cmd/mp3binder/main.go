@@ -8,6 +8,7 @@ import (
 	"os/signal"
 
 	"github.com/crra/mp3binder/cli"
+	"github.com/crra/mp3binder/mp3binder"
 	"github.com/go-logr/stdr"
 	"github.com/spf13/afero"
 )
@@ -45,7 +46,7 @@ func main() {
 	fs := afero.NewOsFs()
 
 	// run the program and clean up
-	if err := cli.New(context, name, version, log, os.Stdout, fs, cwd).Execute(); err != nil {
+	if err := cli.New(context, name, version, log, os.Stdout, fs, cwd, mp3binder.Bind).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
