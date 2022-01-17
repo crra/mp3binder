@@ -47,6 +47,10 @@ func withTwoValidFiles(fs afero.Fs, path string) []string {
 	return makeFiles(fs, []string{validFileName1, validFileName2}, path)
 }
 
+func withThreeValidFiles(fs afero.Fs, path string) []string {
+	return makeFiles(fs, []string{validFileName1, validFileName2, validFileName3}, path)
+}
+
 func TestDirectoryWithNoFile(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
