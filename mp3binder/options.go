@@ -19,7 +19,6 @@ const (
 	stageBind
 
 	stageCopyMetadata
-	stageAfterCopyMetadata
 
 	stageBeforeWriteMetadata
 	stageWriteMetadata
@@ -145,7 +144,7 @@ const (
 
 func Cover(mimeType string, r io.Reader) Option {
 	return func() (stage, string, jobProcessor) {
-		return stageAfterCopyMetadata, "adding cover", func(j *job) error {
+		return stageBeforeWriteMetadata, "adding cover", func(j *job) error {
 			data, err := io.ReadAll(r)
 			if err != nil {
 				return err

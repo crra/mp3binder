@@ -12,15 +12,14 @@ func _() {
 	_ = x[stageReadMetadata-1]
 	_ = x[stageBind-2]
 	_ = x[stageCopyMetadata-3]
-	_ = x[stageAfterCopyMetadata-4]
-	_ = x[stageBeforeWriteMetadata-5]
-	_ = x[stageWriteMetadata-6]
-	_ = x[stageLastElement-7]
+	_ = x[stageBeforeWriteMetadata-4]
+	_ = x[stageWriteMetadata-5]
+	_ = x[stageLastElement-6]
 }
 
-const _stage_name = "InitReadMetadataBindCopyMetadataAfterCopyMetadataBeforeWriteMetadataWriteMetadataLastElement"
+const _stage_name = "InitReadMetadataBindCopyMetadataBeforeWriteMetadataWriteMetadataLastElement"
 
-var _stage_index = [...]uint8{0, 4, 16, 20, 32, 49, 68, 81, 92}
+var _stage_index = [...]uint8{0, 4, 16, 20, 32, 51, 64, 75}
 
 func (i stage) String() string {
 	if i < 0 || i >= stage(len(_stage_index)-1) {
