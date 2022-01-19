@@ -1,5 +1,6 @@
 dist
 .vscode
 *.mp3
-cover.jpg
+*.jpg
 *.png
+.DS_Store
