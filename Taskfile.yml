@@ -31,7 +31,7 @@ tasks:
     desc: Build the binaries for multiple architectures.
     deps:
       - clean
-      - tests
+      - test
     cmds:
       # macOS intel
       - task: build-for
@@ -86,7 +86,7 @@ tasks:
           }
       - task: zip
         vars: { NAME: "windows_amd64" }
-  tests:
+  test:
     desc: Perform all tests
     cmds:
       - go test -cover -race ./...
@@ -95,7 +95,7 @@ tasks:
     desc: Build the binary for the current architecture.
     deps:
       - clean
-      - tests
+      - test
     cmds:
       - task: build-for
         vars:
