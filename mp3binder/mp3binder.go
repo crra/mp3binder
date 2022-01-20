@@ -129,31 +129,33 @@ func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker
 
 func writeMetadata() (stage, string, jobProcessor) {
 	return stageWriteMetadata, "writing metadata", func(j *job) error {
-		var start time.Duration
+		/*
+			var start time.Duration
 
-		for i, m := range j.metadata {
-			title := fmt.Sprintf("Chapter: %d", i+1)
-			intputTitle := m.GetTextFrame(tagTitle).Text
-			if intputTitle != "" {
-				title = fmt.Sprintf("%s: %s", title, intputTitle)
+			for i, m := range j.metadata {
+				title := fmt.Sprintf("Chapter: %d", i+1)
+				intputTitle := m.GetTextFrame(tagTitle).Text
+				if intputTitle != "" {
+					title = fmt.Sprintf("%s: %s", title, intputTitle)
+				}
+
+				end := start + j.inputDurations[i]
+				j.tagObserver(fmt.Sprintf("Chapter: %d from '%s' to '%s'", i+1, start.Round(time.Second), end.Round(time.Second)), title, nil)
+
+				j.tag.AddChapterFrame(id3v2.ChapterFrame{
+					ElementID: fmt.Sprintf("chap-%d", i),
+					StartTime: start,
+					EndTime:   end,
+					Title: &id3v2.TextFrame{
+						Encoding: id3v2.EncodingUTF8,
+						Text:     title,
+					},
+				})
+
+				start = end
 			}
 
-			end := start + j.inputDurations[i]
-			j.tagObserver(fmt.Sprintf("Chapter: %d from '%s' to '%s'", i+1, start.Round(time.Second), end.Round(time.Second)), title, nil)
-
-			j.tag.AddChapterFrame(id3v2.ChapterFrame{
-				ElementID: fmt.Sprintf("chap-%d", i),
-				StartTime: start,
-				EndTime:   end,
-				Title: &id3v2.TextFrame{
-					Encoding: id3v2.EncodingUTF8,
-					Text:     title,
-				},
-			})
-
-			start = end
-		}
-
+		*/
 		if _, err := j.tag.WriteTo(j.output); err != nil {
 			return err
 		}
@@ -177,7 +179,7 @@ func bind() (stage, string, jobProcessor) {
 			_ = lastBitrate // linter: if there are no frames in the file, this value will never
 			j.bindObserver(fileIndex)
 
-			// because intput is read more then once, the seek cursor is reset
+			// because intput could be read more then once, the seek cursor is reset
 			// to the beginning of the stream.
 			if _, err := reader.Seek(0, io.SeekStart); err != nil {
 				return err
