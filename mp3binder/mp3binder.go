@@ -3,6 +3,7 @@ package mp3binder
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -11,21 +12,27 @@ import (
 	"github.com/dmulholl/mp3lib"
 )
 
+var ErrUnusableOption = errors.New("unusable option")
+
 const (
 	emptyInfoXingFrameSize int64 = 209
 	tagTitle                     = "TIT2"
 )
 
 type job struct {
-	context        context.Context
-	output         io.WriteSeeker
-	inputs         []io.ReadSeeker
-	tag            *id3v2.Tag
-	metadata       []*id3v2.Tag
-	inputDurations []time.Duration
-	stageObserver  stageObserver
-	bindObserver   bindObserver
-	tagObserver    tagObserver
+	context context.Context
+	output  io.WriteSeeker
+	inputs  []io.ReadSeeker
+
+	tagResolver tagResolver
+	tag         *id3v2.Tag
+	metadata    []*id3v2.Tag
+
+	inputDurations  []time.Duration
+	stageObserver   stageObserver
+	bindObserver    bindObserver
+	tagCopyObserver tagCopyObserver
+	tagObserver     tagObserver
 }
 
 type namedJobProcessor struct {
@@ -34,28 +41,62 @@ type namedJobProcessor struct {
 }
 
 type (
-	stageObserver func(string, string)
-	bindObserver  func(int)
-	tagObserver   func(string, string, error)
+	stageObserver   func(string, string)
+	bindObserver    func(int)
+	tagCopyObserver func(string, string, error)
+	tagObserver     func(string, string, error)
 )
 
-func discardingStageObserver(string, string)      {}
-func discardingBindObserver(int)                  {}
-func discardingTagObserver(string, string, error) {}
+type tagResolver interface {
+	DescriptionFor(string) (string, error)
+}
 
-func Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...Option) error {
+func discardingStageObserver(string, string)          {}
+func discardingBindObserver(int)                      {}
+func discardingTagObserver(string, string, error)     {}
+func discardingTagCopyObserver(string, string, error) {}
+
+type binder struct {
+	tagResolver tagResolver
+}
+
+func New(tagResolver tagResolver) *binder {
+	return &binder{
+		tagResolver: tagResolver,
+	}
+}
+
+func (b *binder) Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, o ...any) error {
+	options := make([]Option, len(o))
+
+	for i, op := range o {
+		option, ok := op.(Option)
+		if !ok {
+			return ErrUnusableOption
+		}
+
+		options[i] = option
+	}
+
+	return Bind(parent, b.tagResolver, output, input, options...)
+}
+
+func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker, input []io.ReadSeeker, options ...Option) error {
 	j := &job{
 		context: parent,
 		output:  output,
 		inputs:  input,
 
+		tagResolver: tagResolver,
+
 		tag:            id3v2.NewEmptyTag(),
 		inputDurations: make([]time.Duration, len(input)),
 		metadata:       make([]*id3v2.Tag, len(input)),
 
-		stageObserver: discardingStageObserver,
-		bindObserver:  discardingBindObserver,
-		tagObserver:   discardingTagObserver,
+		stageObserver:   discardingStageObserver,
+		bindObserver:    discardingBindObserver,
+		tagObserver:     discardingTagObserver,
+		tagCopyObserver: discardingTagCopyObserver,
 	}
 
 	jobProcessors := make(map[stage][]namedJobProcessor)
@@ -183,10 +224,6 @@ func bind() (stage, string, jobProcessor) {
 					}
 
 					for id := range tag.AllFrames() {
-						if id == tagIdTrack {
-							continue
-						}
-
 						j.metadata[fileIndex].AddFrame(id, tag.GetLastFrame(id))
 					}
 

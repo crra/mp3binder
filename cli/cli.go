@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/crra/mp3binder/mp3binder"
 	"github.com/crra/mp3binder/slice"
 
 	"github.com/carolynvs/aferox"
@@ -22,6 +21,7 @@ var (
 	ErrFileNotFound     = errors.New("file not found")
 	ErrOutputFileExists = errors.New("output file is already existing")
 	ErrInvalidIndex     = errors.New("the provided index is invalid")
+	ErrTagNonStandard   = errors.New("non-standard tag")
 )
 
 const (
@@ -52,14 +52,19 @@ type Service interface {
 	Execute() error
 }
 
-type (
-	binder func(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...mp3binder.Option) error
-)
+type binder interface {
+	Bind(context.Context, io.WriteSeeker, []io.ReadSeeker, ...any) error
+}
+
+type tagResolver interface {
+	DescriptionFor(string) (string, error)
+}
 
 type application struct {
-	name    string
-	version string
-	binder  binder
+	name        string
+	version     string
+	binder      binder
+	tagResolver tagResolver
 
 	fs     aferox.Aferox
 	cwd    string
@@ -97,16 +102,27 @@ func (m mediaFile) String() string {
 	return m.path
 }
 
-func New(parent context.Context, name, version string, log logr.Logger, status io.Writer, fs afero.Fs, cwd string, binder binder) Service {
+const (
+	tagEncoderSoftware = "TSSE"
+	tagIdTrack         = "TRCK"
+	defaultTrackNumber = "1"
+)
+
+func New(parent context.Context, name, version string, log logr.Logger, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver) Service {
 	app := &application{
-		parent:  parent,
-		name:    name,
-		version: version,
-		binder:  binder,
-		log:     log,
-		status:  status,
-		fs:      aferox.NewAferox(cwd, fs),
-		cwd:     cwd,
+		parent:      parent,
+		name:        name,
+		version:     version,
+		binder:      binder,
+		tagResolver: tagResolver,
+		log:         log,
+		status:      status,
+		fs:          aferox.NewAferox(cwd, fs),
+		cwd:         cwd,
+		tags: map[string]string{
+			tagEncoderSoftware: fmt.Sprintf("%s %s", name, version),
+			tagIdTrack:         defaultTrackNumber,
+		},
 	}
 
 	cmd := &cobra.Command{

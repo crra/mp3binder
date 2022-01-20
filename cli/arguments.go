@@ -78,19 +78,47 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		}
 
 		if a.verbose {
-			fmt.Fprintf(a.status, "The id3tags will be copied from file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
+			fmt.Fprintf(a.status, "Id3v2 tags will be copied from file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
 		}
 	}
 
 	if a.applyTags != "" {
-		a.tags, err = keyvalue.StringAsStringMap(a.applyTags)
+		tags, err := keyvalue.StringAsStringMap(a.applyTags)
 		if err != nil {
 			return err
 		}
+
+		for k, v := range tags {
+			if v == "" {
+				delete(a.tags, k)
+				// keep the empty value in a.tags to remove the tag again when e.g. copying from an input file
+			}
+
+			if !a.verbose {
+				if _, err := a.tagResolver.DescriptionFor(k); err != nil {
+					fmt.Fprintf(a.status, "! Warning: the tag '%s' is not a well-known tag but will be written\n", k)
+				}
+			}
+
+			a.tags[k] = v
+		}
+
 		if a.verbose {
-			fmt.Fprintln(a.status, "The following id3tags will be applied:")
+			fmt.Fprintln(a.status, "The following id3v2 tags will be applied:")
+
 			for k := range a.tags {
-				fmt.Fprintf(a.status, "- %s: %s\n", k, a.tags[k])
+				v := a.tags[k]
+				description, err := a.tagResolver.DescriptionFor(k)
+				switch {
+				case v == "" && err != nil:
+					fmt.Fprintf(a.status, "- Not well-known '%s': will be removed if present in the output\n", k)
+				case v == "" && err == nil:
+					fmt.Fprintf(a.status, "- %s (%s): will be removed if present in the output\n", description, k)
+				case err != nil:
+					fmt.Fprintf(a.status, "- Not well-known '%s': %s\n", k, v)
+				default:
+					fmt.Fprintf(a.status, "- %s (%s): %s\n", description, k, v)
+				}
 			}
 		}
 	}

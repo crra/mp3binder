@@ -21,11 +21,11 @@ type testCollector struct {
 	options []mp3binder.Option
 }
 
-func (t *testCollector) bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...mp3binder.Option) error {
+func (t *testCollector) Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...any) error {
 	t.parent = parent
 	t.output = output
 	t.input = input
-	t.options = options
+	// t.options = options
 
 	return t.err
 }
@@ -36,7 +36,7 @@ func TestCreateEmptyFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	a := &application{
-		binder:     tc.bind,
+		binder:     tc,
 		outputPath: "/" + validOutputFile,
 		fs:         aferox.NewAferox("/", fs),
 	}
@@ -54,7 +54,7 @@ func TestRemoveOutputFileOnError(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	a := &application{
-		binder:     tc.bind,
+		binder:     tc,
 		outputPath: "/" + validOutputFile,
 		fs:         aferox.NewAferox("/", fs),
 	}
@@ -73,7 +73,7 @@ func TestMediaFiles(t *testing.T) {
 	mediaFiles := withTwoValidFiles(fs, "/")
 
 	a := &application{
-		binder:     tc.bind,
+		binder:     tc,
 		mediaFiles: mediaFiles,
 		outputPath: "/" + validOutputFile,
 		fs:         aferox.NewAferox("/", fs),
@@ -100,7 +100,7 @@ func TestInterlaceWithTwo(t *testing.T) {
 	}
 
 	a := &application{
-		binder:        tc.bind,
+		binder:        tc,
 		mediaFiles:    mediaFiles,
 		interlaceFile: "/" + validInterlaceFile1,
 		outputPath:    "/" + validOutputFile,
@@ -131,7 +131,7 @@ func TestInterlaceWithThree(t *testing.T) {
 	}
 
 	a := &application{
-		binder:        tc.bind,
+		binder:        tc,
 		mediaFiles:    mediaFiles,
 		interlaceFile: "/" + validInterlaceFile1,
 		outputPath:    "/" + validOutputFile,

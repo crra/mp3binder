@@ -15,6 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var ErrNoTagsInTemplate = errors.New("no tags in template")
+
 // run is the cobra way of running the application.
 func (a *application) run(c *cobra.Command, _ []string) error {
 	if a.interlaceFile != "" {
@@ -46,35 +48,13 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 		return err
 	}
 
-	var options []mp3binder.Option
+	var options []any
 
 	if a.verbose {
-		options = append(options, mp3binder.ActionObserver(func(stage string, action string) {
-			fmt.Fprintf(a.status, "# Processing stage: '%s' and action: '%s'\n", unCamel(stage), action)
-		}))
-
-		options = append(options, mp3binder.BindObserver(func(index int) {
-			fmt.Fprintf(a.status, "- Binding: '%s'\n", filepath.Base(a.mediaFiles[index]))
-		}))
-
-		options = append(options, mp3binder.TagObserver(func(tag, value string, err error) {
-			if err != nil {
-				switch {
-				case errors.Is(err, mp3binder.ErrTagSkipCopying):
-					fmt.Fprintf(a.status, "Info: skipping tag from copy task: '%s'\n", tag)
-				case errors.Is(err, mp3binder.ErrNoTagsInTemplate):
-					fmt.Fprintf(a.status, "! Warning: there are not id3v2 tags in file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
-				case errors.Is(err, mp3binder.ErrTagNonStandard):
-					fmt.Fprintf(a.status, "! Warning: tag '%s' with value '%s' is not a well-known tag, ignoring\n", tag, a.tags[tag])
-				default:
-					fmt.Fprintf(a.status, "! Unhandled warning during tag processing: %v\n", err)
-				}
-
-				return
-			}
-
-			fmt.Fprintf(a.status, "- Adding tag: '%s' with value '%s'\n", tag, value)
-		}))
+		options = append(options, mp3binder.ActionObserver(a.actionObserver))
+		options = append(options, mp3binder.BindObserver(a.bindObserver))
+		options = append(options, mp3binder.TagCopyObserver(a.tagCopyObserver))
+		options = append(options, mp3binder.TagObserver(a.tagObserver))
 	}
 
 	// cover file
@@ -90,7 +70,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 
 	// copy metadata
 	if a.copyTagsFromIndex > 0 {
-		options = append(options, mp3binder.CopyMetadataFrom(a.copyTagsFromIndex-1))
+		options = append(options, mp3binder.CopyMetadataFrom(a.copyTagsFromIndex-1, ErrNoTagsInTemplate))
 	}
 
 	// apply metadata
@@ -99,7 +79,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 	}
 
 	// bind
-	err = a.binder(a.parent, output, inputs, options...)
+	err = a.binder.Bind(a.parent, output, inputs, options...)
 	if err != nil {
 		_ = a.fs.Remove(a.outputPath)
 		return err
@@ -153,4 +133,36 @@ func openFilesOnce(fs afero.Fs, files []string) ([]io.ReadSeeker, func(), error)
 	}
 
 	return input, close, nil
+}
+
+func (a *application) actionObserver(stage, action string) {
+	fmt.Fprintf(a.status, "Processing stage: '%s' and action: '%s'\n", unCamel(stage), action)
+}
+
+func (a *application) bindObserver(index int) {
+	fmt.Fprintf(a.status, "- Binding: '%s'\n", filepath.Base(a.mediaFiles[index]))
+}
+
+func (a *application) tagCopyObserver(tag, value string, err error) {
+	switch {
+	case err != nil && errors.Is(err, ErrNoTagsInTemplate):
+		fmt.Fprintf(a.status, "! Warning: there are not id3v2 tags in file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
+	case err != nil:
+		fmt.Fprintf(a.status, "! Unhandled warning during tag processing: %v\n", err)
+	default:
+		fmt.Fprintf(a.status, "- Copying tag: '%s' with value '%s'\n", tag, value)
+	}
+}
+
+func (a *application) tagObserver(tag, value string, err error) {
+	switch {
+	case err != nil && errors.Is(err, ErrTagNonStandard):
+		fmt.Fprintf(a.status, "! Warning: tag '%s' with value '%s' is not well-known, but will be written\n", tag, a.tags[tag])
+	case err != nil:
+		fmt.Fprintf(a.status, "! Unhandled warning during tag processing: %v\n", err)
+	case value == "":
+		fmt.Fprintf(a.status, "- Removing tag: '%s'\n", tag)
+	default:
+		fmt.Fprintf(a.status, "- Adding tag: '%s' with value '%s'\n", tag, value)
+	}
 }

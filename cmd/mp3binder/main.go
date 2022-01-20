@@ -9,6 +9,7 @@ import (
 
 	"github.com/crra/mp3binder/cli"
 	"github.com/crra/mp3binder/mp3binder"
+	"github.com/crra/mp3binder/mp3binder/tags"
 	"github.com/go-logr/stdr"
 	"github.com/spf13/afero"
 )
@@ -46,7 +47,10 @@ func main() {
 	fs := afero.NewOsFs()
 
 	// run the program and clean up
-	if err := cli.New(context, name, version, log, os.Stdout, fs, cwd, mp3binder.Bind).Execute(); err != nil {
+	resolver := tags.NewV24(cli.ErrTagNonStandard)
+	binder := mp3binder.New(resolver)
+
+	if err := cli.New(context, name, version, log, os.Stdout, fs, cwd, binder, resolver).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

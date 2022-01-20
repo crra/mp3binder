@@ -2,7 +2,6 @@
 package mp3binder
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -25,17 +24,6 @@ const (
 
 	// https://stackoverflow.com/questions/64178176/how-to-create-an-enum-and-iterate-over-it
 	stageLastElement
-)
-
-const (
-	defaultTrackNumber = "1"
-	tagIdTrack         = "TRCK"
-)
-
-var (
-	ErrTagNonStandard   = errors.New("non-standard tag")
-	ErrNoTagsInTemplate = errors.New("no tags in template")
-	ErrTagSkipCopying   = errors.New("ignoring tag for copying")
 )
 
 type (
@@ -74,12 +62,22 @@ func TagObserver(f tagObserver) Option {
 	}
 }
 
-func CopyMetadataFrom(index int) Option {
+func TagCopyObserver(f tagCopyObserver) Option {
+	return func() (stage, string, jobProcessor) {
+		return stageInit, "tag copy observer", func(j *job) error {
+			j.tagCopyObserver = f
+
+			return nil
+		}
+	}
+}
+
+func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageCopyMetadata, "copy metadata", func(j *job) error {
 			template := j.metadata[index]
 			if !template.HasFrames() {
-				j.tagObserver("", "", ErrNoTagsInTemplate)
+				j.tagCopyObserver("", "", errNoTagsInTemplate)
 				return nil
 			}
 
@@ -87,16 +85,10 @@ func CopyMetadataFrom(index int) Option {
 				for _, f := range template.GetFrames(id) {
 					switch ff := f.(type) {
 					case id3v2.TextFrame:
-						if id == tagIdTrack {
-							j.tagObserver(id, "", ErrTagSkipCopying)
-							continue
-						}
-
-						j.tagObserver(id, ff.Text, nil)
+						j.tagCopyObserver(id, ff.Text, nil)
 					case id3v2.PictureFrame:
-						j.tagObserver(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
+						j.tagCopyObserver(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
 					case id3v2.ChapterFrame:
-						j.tagObserver(id, "", ErrTagSkipCopying)
 						continue
 					}
 
@@ -110,27 +102,18 @@ func CopyMetadataFrom(index int) Option {
 }
 
 func ApplyMetadata(tags map[string]string) Option {
-	knownTags := make(map[string]bool, len(id3v2.V23CommonIDs))
-	for _, tagName := range id3v2.V23CommonIDs {
-		knownTags[tagName] = true
-	}
-
 	return func() (stage, string, jobProcessor) {
 		return stageBeforeWriteMetadata, "applying metadata", func(j *job) error {
 			for id, value := range tags {
-				_, exist := knownTags[id]
-				if !exist {
-					j.tagObserver(id, "", ErrTagNonStandard)
-					continue
+
+				description, err := j.tagResolver.DescriptionFor(id)
+				if err != nil {
+					j.tagObserver(id, "", fmt.Errorf("tag '%s': %w", id, err))
+				} else {
+					j.tagObserver(fmt.Sprintf("%s (%s)", description, id), value, nil)
 				}
 
-				j.tagObserver(id, value, nil)
 				j.tag.AddFrame(id, &id3v2.TextFrame{Encoding: j.tag.DefaultEncoding(), Text: value})
-			}
-
-			if _, ok := tags[tagIdTrack]; !ok {
-				j.tag.AddFrame(tagIdTrack, &id3v2.TextFrame{Encoding: j.tag.DefaultEncoding(), Text: defaultTrackNumber})
-				j.tagObserver(tagIdTrack, defaultTrackNumber, nil)
 			}
 
 			return nil
