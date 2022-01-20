@@ -105,12 +105,15 @@ func ApplyMetadata(tags map[string]string) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageBeforeWriteMetadata, "applying metadata", func(j *job) error {
 			for id, value := range tags {
-
 				description, err := j.tagResolver.DescriptionFor(id)
 				if err != nil {
 					j.tagObserver(id, "", fmt.Errorf("tag '%s': %w", id, err))
 				} else {
 					j.tagObserver(fmt.Sprintf("%s (%s)", description, id), value, nil)
+				}
+
+				if value == "" {
+					continue
 				}
 
 				j.tag.AddFrame(id, &id3v2.TextFrame{Encoding: j.tag.DefaultEncoding(), Text: value})
@@ -128,17 +131,19 @@ const (
 func Cover(mimeType string, r io.Reader) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageBeforeWriteMetadata, "adding cover", func(j *job) error {
-			data, err := io.ReadAll(r)
+			frontCoverPicture, err := io.ReadAll(r)
 			if err != nil {
 				return err
 			}
+
+			j.tagObserver(coverType, mimeType, nil)
 
 			j.tag.AddAttachedPicture(id3v2.PictureFrame{
 				Encoding:    j.tag.DefaultEncoding(),
 				MimeType:    mimeType,
 				PictureType: id3v2.PTFrontCover,
 				Description: coverType,
-				Picture:     data,
+				Picture:     frontCoverPicture,
 			})
 
 			return nil
