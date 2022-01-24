@@ -15,15 +15,17 @@ import (
 type testCollector struct {
 	err error
 
-	parent  context.Context
-	output  io.WriteSeeker
-	input   []io.ReadSeeker
-	options []mp3binder.Option
+	parent    context.Context
+	output    io.WriteSeeker
+	audioOnly io.ReadWriteSeeker
+	input     []io.ReadSeeker
+	options   []mp3binder.Option
 }
 
-func (t *testCollector) Bind(parent context.Context, output io.WriteSeeker, input []io.ReadSeeker, options ...any) error {
+func (t *testCollector) Bind(parent context.Context, output io.WriteSeeker, audioOnly io.ReadWriteSeeker, input []io.ReadSeeker, options ...any) error {
 	t.parent = parent
 	t.output = output
+	t.audioOnly = audioOnly
 	t.input = input
 	// t.options = options
 

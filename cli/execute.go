@@ -34,12 +34,21 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	// output
+	// outputs
 	output, err := a.fs.Create(a.outputPath)
 	if err != nil {
 		return err
 	}
 	defer output.Close()
+
+	audioOnlyFile, err := a.fs.TempFile(filepath.Dir(a.outputPath), "")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		audioOnlyFile.Close()
+		a.fs.Remove(audioOnlyFile.Name())
+	}()
 
 	// inputs
 	inputs, close, err := openFilesOnce(a.fs, a.mediaFiles)
@@ -79,7 +88,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 	}
 
 	// bind
-	err = a.binder.Bind(a.parent, output, inputs, options...)
+	err = a.binder.Bind(a.parent, output, audioOnlyFile, inputs, options...)
 	if err != nil {
 		_ = a.fs.Remove(a.outputPath)
 		return err

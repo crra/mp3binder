@@ -6,7 +6,7 @@ vars:
   REALM: "mp3binder"
 
   MP3BINDER_NAME: mp3binder
-  MP3BINDER_MAIN: "./cmd/mp3binder"
+  MP3BINDER_MAIN: "./cmd/tui"
 
   # used as version
   GIT_COMMIT:
@@ -136,8 +136,7 @@ tasks:
         -X main.version="{{.GIT_COMMIT}}"
         -X main.realm="{{.REALM}}"
         -extldflags '-static'" -a
-        -buildvcs=false 
-        -buildinfo=false 
+        -buildvcs=false
         -o {{.OUTPUT}}
         {{.MAIN}}
 

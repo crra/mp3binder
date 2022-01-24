@@ -13,14 +13,14 @@ type stage int
 const (
 	stageInit stage = iota
 
-	stageReadMetadata
-
 	stageBind
 
 	stageCopyMetadata
-
 	stageBeforeWriteMetadata
+	stageWriteChapers
 	stageWriteMetadata
+
+	stageCombineId3AndAudio
 
 	// https://stackoverflow.com/questions/64178176/how-to-create-an-enum-and-iterate-over-it
 	stageLastElement
@@ -75,25 +75,28 @@ func TagCopyObserver(f tagCopyObserver) Option {
 func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageCopyMetadata, "copy metadata", func(j *job) error {
-			template := j.metadata[index]
+			template, err := id3v2.ParseReader(j.inputs[index], id3v2.Options{Parse: true})
+			if err != nil {
+				return err
+			}
+
 			if !template.HasFrames() {
 				j.tagCopyObserver("", "", errNoTagsInTemplate)
 				return nil
 			}
 
 			for id := range template.AllFrames() {
-				for _, f := range template.GetFrames(id) {
-					switch ff := f.(type) {
-					case id3v2.TextFrame:
-						j.tagCopyObserver(id, ff.Text, nil)
-					case id3v2.PictureFrame:
-						j.tagCopyObserver(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
-					case id3v2.ChapterFrame:
-						continue
-					}
-
-					j.tag.AddFrame(id, f)
+				f := template.GetLastFrame(id)
+				switch ff := f.(type) {
+				case id3v2.TextFrame:
+					j.tagCopyObserver(id, ff.Text, nil)
+				case id3v2.PictureFrame:
+					j.tagCopyObserver(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
+				case id3v2.ChapterFrame:
+					continue
 				}
+
+				j.tag.AddFrame(id, f)
 			}
 
 			return nil
