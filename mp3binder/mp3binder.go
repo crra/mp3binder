@@ -143,9 +143,11 @@ func writeMetadata() (stage, string, jobProcessor) {
 			j.tagObserver(fmt.Sprintf("Chapter: %d from '%s' to '%s'", i+1, start.Round(time.Second), end.Round(time.Second)), title, nil)
 
 			j.tag.AddChapterFrame(id3v2.ChapterFrame{
-				ElementID: fmt.Sprintf("c%d", i),
-				StartTime: start,
-				EndTime:   end,
+				ElementID:   fmt.Sprintf("c%d", i),
+				StartTime:   start,
+				EndTime:     end,
+				StartOffset: id3v2.IgnoredOffset,
+				EndOffset:   id3v2.IgnoredOffset,
 				Title: &id3v2.TextFrame{
 					Encoding: id3v2.EncodingUTF8,
 					Text:     title,
