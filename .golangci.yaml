@@ -72,6 +72,20 @@ linters:
     - varcheck
     - whitespace
     - wsl
+    - cyclop
+    - decorder
+    - depguard
+    - dupl
+    - errname
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - go-critic
+    - godox
+    - ifshort
+    - importas
+    - ireturn
+    - maintidx
 
 issues:
   exclude-use-default: false
