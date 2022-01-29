@@ -17,6 +17,8 @@
     "logr",
     "nomagic",
     "stdr",
-    "tcopy"
+    "tcopy",
+    "TRCK",
+    "TSSE"
   ]
 }
