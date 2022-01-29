@@ -48,6 +48,21 @@ var (
 	rootDirectoryName = "root" + outputFileExtension
 )
 
+type statusPrinter interface {
+	language(language string)
+	listMediaFilesAfterInterlace(mediaFiles []string)
+	listInputFiles(mediaFiles []string, outputFile string)
+	coverFile(file string)
+	interlaceFile(file string)
+	copyTagsFrom(file string)
+	tagsToApply(tags map[string]string, tagResolver tagResolver)
+
+	actionObserver(stage, action string)
+	newBindObserver(mediaFiles []string) func(index int)
+	newTagCopyObserver(copyFilename string) func(tag, value string, err error)
+	newTagObserver(tags map[string]string) func(tag, value string, err error)
+}
+
 // Service describes the cli service.
 type Service interface {
 	// Execute executes the service.
@@ -68,9 +83,10 @@ type application struct {
 	binder      binder
 	tagResolver tagResolver
 
-	fs     aferox.Aferox
-	cwd    string
-	status io.Writer
+	fs            aferox.Aferox
+	cwd           string
+	status        io.Writer
+	statusPrinter statusPrinter
 
 	parent context.Context
 
@@ -118,10 +134,13 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 		version:     version,
 		binder:      binder,
 		tagResolver: tagResolver,
-		log:         log,
-		status:      status,
-		fs:          aferox.NewAferox(cwd, fs),
-		cwd:         cwd,
+
+		status:        status,
+		statusPrinter: &discardingPrinter{},
+
+		fs:  aferox.NewAferox(cwd, fs),
+		cwd: cwd,
+
 		tags: map[string]string{
 			tagEncoderSoftware: fmt.Sprintf("%s %s", name, version),
 			tagIdTrack:         defaultTrackNumber,
@@ -131,7 +150,7 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("%s file1.mp3 file2.mp3", name),
-		Example: fmt.Sprintf("Calling '%[1]s' with no parameters is equivalent to: '%[1]s *.mp3 --nomagic'", name),
+		Example: fmt.Sprintf("Calling '%[1]s' with no parameters is equivalent to: '%[1]s *.mp3'", name),
 		Version: version,
 		Short:   fmt.Sprintf("%s joins multiple mp3 files into one", name),
 		Long:    fmt.Sprintf("%s is a simple command line utility for concatenating/joining MP3 files without re-encoding.", name),

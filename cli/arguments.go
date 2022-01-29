@@ -18,6 +18,18 @@ import (
 
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
 func (a *application) args(c *cobra.Command, args []string) error {
+	if a.verbose {
+		a.statusPrinter = newVerbosePrinter(a.status)
+	}
+
+	var err error
+	a.language, err = language.Parse(a.languageStr)
+	if err != nil {
+		return fmt.Errorf("provided language '%s': %w", a.languageStr, ErrUnsupportedLanguage)
+	}
+
+	a.statusPrinter.language(a.language.String())
+
 	mediaFiles, outputCandidateName, err := getMediaFilesFromArguments(a.fs, args)
 	if err != nil {
 		return err
@@ -26,7 +38,7 @@ func (a *application) args(c *cobra.Command, args []string) error {
 	a.outputPath, err = getOutputFile(a.fs, a.outputPath, a.overwrite, outputCandidateName)
 	if err != nil {
 		if errors.Is(err, ErrOutputFileExists) {
-			return fmt.Errorf("%w, use '--force' to overwrite", err)
+			return fmt.Errorf("use '--force' to overwrite: %w", err)
 		}
 
 		return err
@@ -42,44 +54,28 @@ func (a *application) args(c *cobra.Command, args []string) error {
 		return ErrAtLeastTwo
 	}
 
-	if a.verbose {
-		padding := len(strconv.Itoa(len(a.mediaFiles)))
-
-		fmt.Fprintf(a.status, "The following files will be 'bound' as: '%s'\n", a.outputPath)
-		format := fmt.Sprintf("- %%%[1]dd: %%s\n", padding)
-		for i, f := range a.mediaFiles {
-			fmt.Fprintf(a.status, format, i+1, f)
-		}
-	}
+	a.statusPrinter.listInputFiles(a.mediaFiles, a.outputPath)
 
 	a.coverFile, a.coverFileMimeType, err = lookupMimeType(getDiscoverableFile(a.fs, a.coverFile, a.noDiscovery, "cover", isAcceptedCoverFile, coverFiles))
 	if err != nil {
 		return err
 	}
 
-	if a.coverFile != "" {
-		if a.verbose {
-			fmt.Fprintf(a.status, "The following file will be used as cover: '%s'\n", a.coverFile)
-		}
-	}
+	a.statusPrinter.coverFile(a.coverFile)
 
 	a.interlaceFile, err = getDiscoverableFile(a.fs, a.interlaceFile, a.noDiscovery, "interlace", isAcceptedInterlaceFile, interlaceFiles)
 	if err != nil {
 		return err
 	}
 
-	if a.verbose && a.interlaceFile != "" {
-		fmt.Fprintf(a.status, "The following file will be used as interlace: '%s'\n", a.interlaceFile)
-	}
+	a.statusPrinter.interlaceFile(a.interlaceFile)
 
 	if a.copyTagsFromIndex > 0 {
 		if a.copyTagsFromIndex-1 >= len(a.mediaFiles) {
 			return fmt.Errorf("index: '%d': %w", a.copyTagsFromIndex, ErrInvalidIndex)
 		}
 
-		if a.verbose {
-			fmt.Fprintf(a.status, "Id3v2 tags will be copied from file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
-		}
+		a.statusPrinter.copyTagsFrom(a.mediaFiles[a.copyTagsFromIndex-1])
 	}
 
 	if a.applyTags != "" {
@@ -96,31 +92,14 @@ func (a *application) args(c *cobra.Command, args []string) error {
 
 			if !a.verbose {
 				if _, err := a.tagResolver.DescriptionFor(k); err != nil {
-					fmt.Fprintf(a.status, "! Warning: the tag '%s' is not a well-known tag but will be written\n", k)
+					fmt.Fprintf(a.status, "! Warning: the tag '%s' is not a well-known tag, but will be written\n", k)
 				}
 			}
 
 			a.tags[k] = v
 		}
 
-		if a.verbose {
-			fmt.Fprintln(a.status, "The following id3v2 tags will be applied:")
-
-			for k := range a.tags {
-				v := a.tags[k]
-				description, err := a.tagResolver.DescriptionFor(k)
-				switch {
-				case v == "" && err != nil:
-					fmt.Fprintf(a.status, "- Not well-known '%s': will be removed if present in the output\n", k)
-				case v == "" && err == nil:
-					fmt.Fprintf(a.status, "- %s (%s): will be removed if present in the output\n", description, k)
-				case err != nil:
-					fmt.Fprintf(a.status, "- Not well-known '%s': %s\n", k, v)
-				default:
-					fmt.Fprintf(a.status, "- %s (%s): %s\n", description, k, v)
-				}
-			}
-		}
+		a.statusPrinter.tagsToApply(tags, a.tagResolver)
 	}
 
 	return nil

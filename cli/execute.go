@@ -13,9 +13,12 @@ import (
 	"github.com/crra/mp3binder/slice"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
 )
 
 var ErrNoTagsInTemplate = errors.New("no tags in template")
+
+const tagTitle = "TIT2"
 
 // run is the cobra way of running the application.
 func (a *application) run(c *cobra.Command, _ []string) error {
@@ -23,15 +26,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 		a.mediaFiles = slice.Interlace(a.mediaFiles, a.interlaceFile)
 		a.copyTagsFromIndex = slice.IndexAfterInterlace(len(a.mediaFiles), a.copyTagsFromIndex-1)
 
-		if a.verbose {
-			padding := len(strconv.Itoa(len(a.mediaFiles)))
-
-			fmt.Fprintln(a.status, "Files to bind after applying the interlace file:")
-			format := fmt.Sprintf("- %%%[1]dd: %%s\n", padding)
-			for i, f := range a.mediaFiles {
-				fmt.Fprintf(a.status, format, i+1, f)
-			}
-		}
+		a.statusPrinter.listMediaFilesAfterInterlace(a.mediaFiles)
 	}
 
 	// outputs
@@ -57,14 +52,39 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 		return err
 	}
 
-	var options []any
+	// options
+	titles := make([]string, len(a.mediaFiles))
 
-	if a.verbose {
-		options = append(options, mp3binder.ActionObserver(a.actionObserver))
-		options = append(options, mp3binder.BindObserver(a.bindObserver))
-		options = append(options, mp3binder.TagCopyObserver(a.tagCopyObserver))
-		options = append(options, mp3binder.TagObserver(a.tagObserver))
+	options := []any{
+		// visitors
+		mp3binder.ActionVisitor(a.statusPrinter.actionObserver),
+		mp3binder.BindVisitor(a.statusPrinter.newBindObserver(a.mediaFiles)),
+		// Extract the title tag for each media file
+		mp3binder.MetadataVisitor(func(index int, tags map[string]string) {
+			titles[index] = tags[tagTitle]
+			if titles[index] == "" {
+				file := filepath.Base(a.mediaFiles[index])
+				titles[index] = cases.Title(a.language).String(strings.TrimSuffix(file, path.Ext(file)))
+			}
+		}),
+		mp3binder.TagApplyVisitor(a.statusPrinter.newTagObserver(a.tags)),
 	}
+
+	if a.copyTagsFromIndex > 0 {
+		options = append(options, mp3binder.TagCopyVisitor(
+			a.statusPrinter.newTagCopyObserver(a.mediaFiles[a.copyTagsFromIndex-1])))
+	}
+
+	// chapter
+	options = append(options, mp3binder.Chapters(func(index, chapterIndex int) (bool, string) {
+		chapterTitle := fmt.Sprintf("Chapter %d", chapterIndex)
+		chapterTitleFromMediaFile := titles[index]
+		if chapterTitleFromMediaFile != "" {
+			chapterTitle = chapterTitleFromMediaFile
+		}
+
+		return (a.interlaceFile == "") || (a.mediaFiles[index] != a.interlaceFile), chapterTitle
+	}))
 
 	// cover file
 	if a.coverFile != "" {
@@ -84,7 +104,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 
 	// apply metadata
 	if len(a.tags) > 0 {
-		options = append(options, mp3binder.ApplyMetadata(a.tags))
+		options = append(options, mp3binder.ApplyTextMetadata(a.tags))
 	}
 
 	// bind
@@ -142,36 +162,4 @@ func openFilesOnce(fs afero.Fs, files []string) ([]io.ReadSeeker, func(), error)
 	}
 
 	return input, close, nil
-}
-
-func (a *application) actionObserver(stage, action string) {
-	fmt.Fprintf(a.status, "Processing stage: '%s' and action: '%s'\n", unCamel(stage), action)
-}
-
-func (a *application) bindObserver(index int) {
-	fmt.Fprintf(a.status, "- Binding: '%s'\n", filepath.Base(a.mediaFiles[index]))
-}
-
-func (a *application) tagCopyObserver(tag, value string, err error) {
-	switch {
-	case err != nil && errors.Is(err, ErrNoTagsInTemplate):
-		fmt.Fprintf(a.status, "! Warning: there are not id3v2 tags in file: '%s'\n", a.mediaFiles[a.copyTagsFromIndex-1])
-	case err != nil:
-		fmt.Fprintf(a.status, "! Unhandled warning during tag processing: %v\n", err)
-	default:
-		fmt.Fprintf(a.status, "- Copying tag: '%s' with value '%s'\n", tag, value)
-	}
-}
-
-func (a *application) tagObserver(tag, value string, err error) {
-	switch {
-	case err != nil && errors.Is(err, ErrTagNonStandard):
-		fmt.Fprintf(a.status, "! Warning: tag '%s' with value '%s' is not well-known, but will be written\n", tag, a.tags[tag])
-	case err != nil:
-		fmt.Fprintf(a.status, "! Unhandled warning during tag processing: %v\n", err)
-	case value == "":
-		fmt.Fprintf(a.status, "- Removing tag: '%s'\n", tag)
-	default:
-		fmt.Fprintf(a.status, "- Adding tag: '%s' with value '%s'\n", tag, value)
-	}
 }
