@@ -11,16 +11,18 @@ import (
 	"github.com/carolynvs/aferox"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/language"
 )
 
 var (
-	ErrNoInput          = errors.New("no input files specified")
-	ErrAtLeastTwo       = errors.New("at least two files are required")
-	ErrInvalidFile      = errors.New("invalid file")
-	ErrFileNotFound     = errors.New("file not found")
-	ErrOutputFileExists = errors.New("output file is already existing")
-	ErrInvalidIndex     = errors.New("the provided index is invalid")
-	ErrTagNonStandard   = errors.New("non-standard tag")
+	ErrNoInput             = errors.New("no input files specified")
+	ErrAtLeastTwo          = errors.New("at least two files are required")
+	ErrInvalidFile         = errors.New("invalid file")
+	ErrFileNotFound        = errors.New("file not found")
+	ErrOutputFileExists    = errors.New("output file is already existing")
+	ErrInvalidIndex        = errors.New("the provided index is invalid")
+	ErrTagNonStandard      = errors.New("non-standard tag")
+	ErrUnsupportedLanguage = errors.New("unsupported language")
 )
 
 const (
@@ -32,6 +34,7 @@ const (
 	flagOutputFile    = "output"
 	flagApplyTags     = "tapply"
 	flagCopyTags      = "tcopy"
+	flagLanguageStr   = "lang"
 )
 
 var (
@@ -141,6 +144,8 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 	}
 
 	cmd.SetOutput(status)
+	app.command = cmd
+
 	f := cmd.Flags()
 	f.SortFlags = false // prefer the order defined by the code
 
@@ -152,8 +157,7 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 	f.StringVar(&app.outputPath, flagOutputFile, app.outputPath, "output filepath. Defaults to name of the folder of the first file provided")
 	f.StringVar(&app.applyTags, flagApplyTags, app.applyTags, "apply id3v2 tags to output file.\nTakes the format: 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
 	f.IntVar(&app.copyTagsFromIndex, flagCopyTags, app.copyTagsFromIndex, "copy the ID3 metadata tag from the n-th input file, starting with 1")
-
-	app.command = cmd
+	f.StringVar(&app.languageStr, flagLanguageStr, app.languageStr, "ISO-639 language string used during string manipulation (e.g. uppercase)")
 
 	return app
 }

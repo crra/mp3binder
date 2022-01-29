@@ -6,7 +6,6 @@ import (
 	fs2 "io/fs"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/carolynvs/aferox"
@@ -14,6 +13,7 @@ import (
 	"github.com/crra/mp3binder/slice"
 	"github.com/crra/mp3binder/value"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/language"
 )
 
 // args is the cobra way of performing checks on the arguments before running                                                                                                                                                                                                                                                                                                                                                                                                                                                the application.
