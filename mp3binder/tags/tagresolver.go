@@ -1,7 +1,7 @@
 package tags
 
 import (
-	"github.com/bogem/id3v2/v2"
+	"github.com/crra/id3v2/v2"
 )
 
 type tagResolver struct {

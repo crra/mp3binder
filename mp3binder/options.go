@@ -4,10 +4,12 @@ package mp3binder
 import (
 	"fmt"
 	"io"
+	"time"
 
-	"github.com/bogem/id3v2/v2"
+	"github.com/crra/id3v2/v2"
 )
 
+// stage defines an action sequence.
 type stage int
 
 const (
@@ -16,8 +18,8 @@ const (
 	stageBind
 
 	stageCopyMetadata
-	stageBeforeWriteMetadata
-	stageWriteChapers
+	stageApplyMetadata
+	stageBuildChapers
 	stageWriteMetadata
 
 	stageCombineId3AndAudio
@@ -27,51 +29,74 @@ const (
 )
 
 type (
+	// jobProcessor is a function that is called for the current job.
 	jobProcessor func(*job) error
-	Option       func() (stage, string, jobProcessor)
+	// Option is a function that offers functional configuration
+	// see: https://commandcenter.blogspot.com/2014/01/self-referential-functions-and-design.html
+	Option func() (stage, string, jobProcessor)
 )
 
-func ActionObserver(f stageObserver) Option {
+// ActionVisitor registers a callback to receive the name of the current action
+// to be executed.
+func ActionVisitor(f stageVisitor) Option {
 	return func() (stage, string, jobProcessor) {
-		const action = "stage observer"
-		return stageInit, action, func(j *job) error {
-			j.stageObserver = f
+		return stageInit, "stage visitor", func(j *job) error {
+			j.stageVisitor = f
 
 			return nil
 		}
 	}
 }
 
-func BindObserver(f bindObserver) Option {
+// BindVisitor registers a callback to receive the index of the current
+// file to be bound.
+func BindVisitor(f bindVisitor) Option {
 	return func() (stage, string, jobProcessor) {
-		return stageInit, "bind observer", func(j *job) error {
-			j.bindObserver = f
+		return stageInit, "bind visitor", func(j *job) error {
+			j.bindVisitor = f
 
 			return nil
 		}
 	}
 }
 
-func TagObserver(f tagObserver) Option {
+// TagApplyVisitor registers a callback the receive a key/value pair that is
+// currently applied to the output file.
+func TagApplyVisitor(f tagApplyVisitor) Option {
 	return func() (stage, string, jobProcessor) {
-		return stageInit, "tag observer", func(j *job) error {
-			j.tagObserver = f
+		return stageInit, "tag visitor", func(j *job) error {
+			j.tagApplyVisitor = f
 
 			return nil
 		}
 	}
 }
 
-func TagCopyObserver(f tagCopyObserver) Option {
+// TagCopyVisitor registers a callback to receive a key/value pair that is
+// currently copied from an input file.
+func TagCopyVisitor(f tagCopyVisitor) Option {
 	return func() (stage, string, jobProcessor) {
-		return stageInit, "tag copy observer", func(j *job) error {
-			j.tagCopyObserver = f
+		return stageInit, "tag copy visitor", func(j *job) error {
+			j.tagCopyVisitor = f
 
 			return nil
 		}
 	}
 }
 
+// MetadataVisitor registers a callback to receive the parsed metadata of the
+// media files.
+func MetadataVisitor(f metadataVisitor) Option {
+	return func() (stage, string, jobProcessor) {
+		return stageInit, "metadata visitor", func(j *job) error {
+			j.metadataVisitor = f
+
+			return nil
+		}
+	}
+}
+
+// CopyMetadataFrom copies the metadata from an input file to the output file (incl. cover files).
 func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageCopyMetadata, "copy metadata", func(j *job) error {
@@ -81,7 +106,7 @@ func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 			}
 
 			if !template.HasFrames() {
-				j.tagCopyObserver("", "", errNoTagsInTemplate)
+				j.tagCopyVisitor("", "", errNoTagsInTemplate)
 				return nil
 			}
 
@@ -89,9 +114,9 @@ func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 				f := template.GetLastFrame(id)
 				switch ff := f.(type) {
 				case id3v2.TextFrame:
-					j.tagCopyObserver(id, ff.Text, nil)
+					j.tagCopyVisitor(id, ff.Text, nil)
 				case id3v2.PictureFrame:
-					j.tagCopyObserver(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
+					j.tagCopyVisitor(id, fmt.Sprintf("Image of type '%s'", ff.MimeType), nil)
 				case id3v2.ChapterFrame:
 					continue
 				}
@@ -104,15 +129,16 @@ func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 	}
 }
 
-func ApplyMetadata(tags map[string]string) Option {
+// ApplyTextMetadata applies key/value pairs of text as metadata to the bounded file.
+func ApplyTextMetadata(tags map[string]string) Option {
 	return func() (stage, string, jobProcessor) {
-		return stageBeforeWriteMetadata, "applying metadata", func(j *job) error {
+		return stageApplyMetadata, "applying text metadata", func(j *job) error {
 			for id, value := range tags {
 				description, err := j.tagResolver.DescriptionFor(id)
 				if err != nil {
-					j.tagObserver(id, "", fmt.Errorf("tag '%s': %w", id, err))
+					j.tagApplyVisitor(id, "", fmt.Errorf("tag '%s': %w", id, err))
 				} else {
-					j.tagObserver(fmt.Sprintf("%s (%s)", description, id), value, nil)
+					j.tagApplyVisitor(fmt.Sprintf("%s (%s)", description, id), value, nil)
 				}
 
 				if value == "" {
@@ -127,19 +153,18 @@ func ApplyMetadata(tags map[string]string) Option {
 	}
 }
 
-const (
-	coverType = "Front cover"
-)
+const coverType = "Front cover"
 
+// Cover assigns a file as cover to the bounded file.
 func Cover(mimeType string, r io.Reader) Option {
 	return func() (stage, string, jobProcessor) {
-		return stageBeforeWriteMetadata, "adding cover", func(j *job) error {
+		return stageApplyMetadata, "adding cover", func(j *job) error {
 			frontCoverPicture, err := io.ReadAll(r)
 			if err != nil {
 				return err
 			}
 
-			j.tagObserver(coverType, mimeType, nil)
+			j.tagApplyVisitor(coverType, mimeType, nil)
 
 			j.tag.AddAttachedPicture(id3v2.PictureFrame{
 				Encoding:    j.tag.DefaultEncoding(),
@@ -148,6 +173,59 @@ func Cover(mimeType string, r io.Reader) Option {
 				Description: coverType,
 				Picture:     frontCoverPicture,
 			})
+
+			return nil
+		}
+	}
+}
+
+// Chapters uses a callback function to resolve the title of the chapter for a file that bound.
+func Chapters(resolveFunc func(index int, chapterIndex int) (bool, string)) Option {
+	return func() (stage, string, jobProcessor) {
+		return stageBuildChapers, "adding chapters", func(j *job) error {
+			var start time.Duration
+
+			chaptersIds := make([]string, 0, len(j.metadata))
+			chapterIndex := 1
+			for i, numberOfFiles := 0, len(j.inputDurations); i < numberOfFiles; i++ {
+				end := start + j.inputDurations[i]
+
+				createChapter, chapterTitle := resolveFunc(i, chapterIndex)
+
+				if !createChapter {
+					// skip (e.g. due to an interlace file)
+					continue
+				}
+
+				chapterId := fmt.Sprintf("c%d", chapterIndex)
+
+				j.tag.AddChapterFrame(id3v2.ChapterFrame{
+					ElementID:   chapterId,
+					StartTime:   start,
+					EndTime:     end,
+					StartOffset: id3v2.IgnoredOffset,
+					EndOffset:   id3v2.IgnoredOffset,
+					Title: &id3v2.TextFrame{
+						Encoding: id3v2.EncodingUTF8,
+						Text:     chapterTitle,
+					},
+				})
+
+				j.tagApplyVisitor(fmt.Sprintf("Chapter: %d from '%s' to '%s'", chapterIndex, start.Round(time.Second), end.Round(time.Second)), chapterTitle, nil)
+
+				chaptersIds = append(chaptersIds, chapterId)
+				start = end
+				chapterIndex++
+			}
+
+			if len(chaptersIds) > 0 {
+				j.tag.AddChapterTocFrame(id3v2.ChapterTocFrame{
+					ElementID:  "MainChapterToc",
+					TopLevel:   true,
+					Ordered:    true,
+					ChapterIds: chaptersIds,
+				})
+			}
 
 			return nil
 		}

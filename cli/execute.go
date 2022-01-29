@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode"
 

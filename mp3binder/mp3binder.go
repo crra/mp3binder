@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/bogem/id3v2/v2"
+	"github.com/crra/id3v2/v2"
 	"github.com/dmulholl/mp3lib"
 )
 
@@ -30,10 +30,11 @@ type job struct {
 	metadata    []*id3v2.Tag
 
 	inputDurations  []time.Duration
-	stageObserver   stageObserver
-	bindObserver    bindObserver
-	tagCopyObserver tagCopyObserver
-	tagObserver     tagObserver
+	stageVisitor    stageVisitor
+	metadataVisitor metadataVisitor
+	bindVisitor     bindVisitor
+	tagCopyVisitor  tagCopyVisitor
+	tagApplyVisitor tagApplyVisitor
 }
 
 type namedJobProcessor struct {
@@ -42,20 +43,16 @@ type namedJobProcessor struct {
 }
 
 type (
-	stageObserver   func(string, string)
-	bindObserver    func(int)
-	tagCopyObserver func(string, string, error)
-	tagObserver     func(string, string, error)
+	stageVisitor    func(string, string)
+	metadataVisitor func(index int, tags map[string]string)
+	bindVisitor     func(int)
+	tagCopyVisitor  func(string, string, error)
+	tagApplyVisitor func(string, string, error)
 )
 
 type tagResolver interface {
 	DescriptionFor(string) (string, error)
 }
-
-func discardingStageObserver(string, string)          {}
-func discardingBindObserver(int)                      {}
-func discardingTagObserver(string, string, error)     {}
-func discardingTagCopyObserver(string, string, error) {}
 
 type binder struct {
 	tagResolver tagResolver
@@ -95,15 +92,16 @@ func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker
 		inputDurations: make([]time.Duration, len(input)),
 		metadata:       make([]*id3v2.Tag, len(input)),
 
-		stageObserver:   discardingStageObserver,
-		bindObserver:    discardingBindObserver,
-		tagObserver:     discardingTagObserver,
-		tagCopyObserver: discardingTagCopyObserver,
+		stageVisitor:    func(string, string) {},
+		metadataVisitor: func(int, map[string]string) {},
+		bindVisitor:     func(int) {},
+		tagApplyVisitor: func(string, string, error) {},
+		tagCopyVisitor:  func(string, string, error) {},
 	}
 
 	jobProcessors := make(map[stage][]namedJobProcessor)
 
-	options = append(options, bind, writeMetadata, combineId3AndAudio)
+	options = append(options, bindAudioOnly, notifyMetadata, writeMetadata, combineMetadataAndAudio)
 
 	for _, o := range options {
 		stage, name, processor := o()
@@ -117,7 +115,7 @@ func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker
 	for s := stage(0); s < stageLastElement; s++ {
 		for _, p := range jobProcessors[s] {
 			if s != stageInit {
-				j.stageObserver(s.String(), p.name)
+				j.stageVisitor(s.String(), p.name)
 			}
 			if err := p.processor(j); err != nil {
 				return err
@@ -130,33 +128,6 @@ func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker
 
 func writeMetadata() (stage, string, jobProcessor) {
 	return stageWriteMetadata, "writing metadata", func(j *job) error {
-		var start time.Duration
-
-		for i, m := range j.metadata {
-			title := fmt.Sprintf("Chapter: %d", i+1)
-			intputTitle := m.GetTextFrame(tagTitle).Text
-			if intputTitle != "" {
-				title = fmt.Sprintf("%s: %s", title, intputTitle)
-			}
-
-			end := start + j.inputDurations[i]
-			j.tagObserver(fmt.Sprintf("Chapter: %d from '%s' to '%s'", i+1, start.Round(time.Second), end.Round(time.Second)), title, nil)
-
-			j.tag.AddChapterFrame(id3v2.ChapterFrame{
-				ElementID:   fmt.Sprintf("c%d", i),
-				StartTime:   start,
-				EndTime:     end,
-				StartOffset: id3v2.IgnoredOffset,
-				EndOffset:   id3v2.IgnoredOffset,
-				Title: &id3v2.TextFrame{
-					Encoding: id3v2.EncodingUTF8,
-					Text:     title,
-				},
-			})
-
-			start = end
-		}
-
 		if _, err := j.tag.WriteTo(j.output); err != nil {
 			return err
 		}
@@ -165,7 +136,7 @@ func writeMetadata() (stage, string, jobProcessor) {
 	}
 }
 
-func bind() (stage, string, jobProcessor) {
+func bindAudioOnly() (stage, string, jobProcessor) {
 	return stageBind, "Binding", func(j *job) error {
 		if _, err := j.audioOnly.Write(make([]byte, emptyInfoXingFrameSize)); err != nil {
 			return err
@@ -178,7 +149,7 @@ func bind() (stage, string, jobProcessor) {
 
 		for fileIndex, reader := range j.inputs {
 			_ = lastBitrate // linter: if there are no frames in the file, this value will never set
-			j.bindObserver(fileIndex)
+			j.bindVisitor(fileIndex)
 
 			// because intput could be read more then once, the seek cursor is reset
 			// to the beginning of the stream.
@@ -244,6 +215,32 @@ func bind() (stage, string, jobProcessor) {
 	}
 }
 
+func tagToMap(tag *id3v2.Tag) map[string]string {
+	m := make(map[string]string)
+	if tag == nil || !tag.HasFrames() {
+		return m
+	}
+
+	for id := range tag.AllFrames() {
+		f := tag.GetLastFrame(id)
+		if tf, ok := f.(id3v2.TextFrame); ok {
+			m[id] = tf.Text
+		}
+	}
+
+	return m
+}
+
+func notifyMetadata() (stage, string, jobProcessor) {
+	return stageApplyMetadata, "notify visitor", func(j *job) error {
+		for i, t := range j.metadata {
+			j.metadataVisitor(i, tagToMap(t))
+		}
+
+		return nil
+	}
+}
+
 func writeBitrateHeader(out io.WriteSeeker, framesCount, bytesCount uint32, multipleBitrates bool) error {
 	var emptyInfoXingFrameOffset int64 = int64(bytesCount) + emptyInfoXingFrameSize
 	if _, err := out.Seek(emptyInfoXingFrameOffset*-1, io.SeekCurrent); err != nil {
@@ -294,8 +291,8 @@ func getSideInfoSize(frame *mp3lib.MP3Frame) int {
 	return size
 }
 
-func combineId3AndAudio() (stage, string, jobProcessor) {
-	return stageCombineId3AndAudio, "combining id3 and audio", func(j *job) error {
+func combineMetadataAndAudio() (stage, string, jobProcessor) {
+	return stageCombineId3AndAudio, "combining metadata and audio", func(j *job) error {
 		if _, err := j.audioOnly.Seek(0, io.SeekStart); err != nil {
 			return err
 		}
