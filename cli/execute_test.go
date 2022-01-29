@@ -37,11 +37,9 @@ func TestCreateEmptyFile(t *testing.T) {
 	tc := &testCollector{}
 	fs := afero.NewMemMapFs()
 
-	a := &application{
-		binder:     tc,
-		outputPath: "/" + validOutputFile,
-		fs:         aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.binder = tc
+	a.outputPath = "/" + validOutputFile
 
 	err := a.run(nil, nil)
 	if assert.NoError(t, err) {
@@ -55,11 +53,9 @@ func TestRemoveOutputFileOnError(t *testing.T) {
 	tc := &testCollector{err: assert.AnError}
 	fs := afero.NewMemMapFs()
 
-	a := &application{
-		binder:     tc,
-		outputPath: "/" + validOutputFile,
-		fs:         aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.binder = tc
+	a.outputPath = "/" + validOutputFile
 
 	err := a.run(nil, nil)
 	if assert.Error(t, err) {
@@ -74,12 +70,10 @@ func TestMediaFiles(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	mediaFiles := withTwoValidFiles(fs, "/")
 
-	a := &application{
-		binder:     tc,
-		mediaFiles: mediaFiles,
-		outputPath: "/" + validOutputFile,
-		fs:         aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.binder = tc
+	a.mediaFiles = mediaFiles
+	a.outputPath = "/" + validOutputFile
 
 	err := a.run(nil, nil)
 	if assert.NoError(t, err) {
@@ -101,13 +95,12 @@ func TestInterlaceWithTwo(t *testing.T) {
 		"/" + validFileName2,
 	}
 
-	a := &application{
-		binder:        tc,
-		mediaFiles:    mediaFiles,
-		interlaceFile: "/" + validInterlaceFile1,
-		outputPath:    "/" + validOutputFile,
-		fs:            aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+
+	a.binder = tc
+	a.mediaFiles = mediaFiles
+	a.interlaceFile = "/" + validInterlaceFile1
+	a.outputPath = "/" + validOutputFile
 
 	err := a.run(nil, nil)
 	if assert.NoError(t, err) {
@@ -132,13 +125,11 @@ func TestInterlaceWithThree(t *testing.T) {
 		"/" + validFileName3,
 	}
 
-	a := &application{
-		binder:        tc,
-		mediaFiles:    mediaFiles,
-		interlaceFile: "/" + validInterlaceFile1,
-		outputPath:    "/" + validOutputFile,
-		fs:            aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.binder = tc
+	a.mediaFiles = mediaFiles
+	a.interlaceFile = "/" + validInterlaceFile1
+	a.outputPath = "/" + validOutputFile
 
 	err := a.run(nil, nil)
 	if assert.NoError(t, err) {

@@ -25,10 +25,8 @@ func TestOutputFileNotExisting(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
-	a := &application{
-		fs:         aferox.NewAferox("/", fs),
-		outputPath: validOutputFile,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.outputPath = validOutputFile
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
@@ -42,10 +40,8 @@ func TestOutputFileMissingExtension(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
-	a := &application{
-		fs:         aferox.NewAferox("/", fs),
-		outputPath: fileNameWithoutExtension(validOutputFile),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.outputPath = fileNameWithoutExtension(validOutputFile)
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
@@ -60,10 +56,8 @@ func TestOutputFileExistingNoOverwrite(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validOutputFile, defaultFileContent, 0644)
 
-	a := &application{
-		fs:         aferox.NewAferox("/", fs),
-		outputPath: validOutputFile,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.outputPath = validOutputFile
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrOutputFileExists)
@@ -76,11 +70,9 @@ func TestOutputFileExistingOverwrite(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validOutputFile, defaultFileContent, 0644)
 
-	a := &application{
-		fs:         aferox.NewAferox("/", fs),
-		outputPath: validOutputFile,
-		overwrite:  true,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.outputPath = validOutputFile
+	a.overwrite = true
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
@@ -131,11 +123,9 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 		f := f // pin
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
 			t.Parallel()
-			a := &application{
-				fs:         aferox.NewAferox("/", fs),
-				outputPath: f.outputPath,
-				overwrite:  true,
-			}
+			a := newDefaultApplication(aferox.NewAferox("/", fs))
+			a.outputPath = f.outputPath
+			a.overwrite = true
 
 			err := a.args(nil, []string{"../" + sampleDirectory})
 			if assert.NoError(t, err) {
@@ -162,9 +152,7 @@ func TestOutputFileFromRootDirectory1(t *testing.T) {
 
 	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)), defaultFileContent, 0644)
 
-	a := &application{
-		fs: aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
 
 	err := a.args(nil, []string{"/"})
 	if assert.NoError(t, err) {

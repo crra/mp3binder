@@ -16,10 +16,9 @@ func TestCopyIndex(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
 	for i := 1; i <= numberOfFiles+1; i++ {
-		a := &application{
-			fs:                aferox.NewAferox("/", fs),
-			copyTagsFromIndex: i,
-		}
+		a := newDefaultApplication(aferox.NewAferox("/", fs))
+		a.copyTagsFromIndex = i
+
 		err := a.args(nil, []string{"."})
 		if i <= numberOfFiles {
 			assert.NoError(t, err)

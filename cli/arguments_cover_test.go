@@ -23,10 +23,8 @@ func TestNonExistingCoverFile(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 
-	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: invalidCoverFile,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.coverFile = invalidCoverFile
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrFileNotFound)
@@ -39,10 +37,8 @@ func TestInvalidCoverFile(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+invalidCoverFile, defaultFileContent, 0644)
 
-	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: invalidCoverFile,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.coverFile = invalidCoverFile
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrInvalidFile)
@@ -55,10 +51,8 @@ func TestCoverFileIsDir(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	fs.MkdirAll("/"+validCoverFile1, 0755)
 
-	a := &application{
-		fs:        aferox.NewAferox("/", fs),
-		coverFile: validCoverFile1,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.coverFile = validCoverFile1
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrInvalidFile)
@@ -80,10 +74,8 @@ func TestValidCoverFile(t *testing.T) {
 	} {
 		afero.WriteFile(fs, "/"+f, defaultFileContent, 0644)
 
-		a := &application{
-			fs:        aferox.NewAferox("/", fs),
-			coverFile: f,
-		}
+		a := newDefaultApplication(aferox.NewAferox("/", fs))
+		a.coverFile = f
 
 		err := a.args(nil, []string{"."})
 		assert.NoError(t, err)
@@ -97,9 +89,7 @@ func TestDiscoverCoverFile(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validCoverFile1, defaultFileContent, 0644)
 
-	a := &application{
-		fs: aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
@@ -114,10 +104,8 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+validCoverFile1, defaultFileContent, 0644)
 
-	a := &application{
-		fs:          aferox.NewAferox("/", fs),
-		noDiscovery: true,
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a.noDiscovery = true
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
@@ -132,9 +120,7 @@ func TestDiscoverCoverFileUppercased(t *testing.T) {
 	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
 	afero.WriteFile(fs, "/"+strings.ToUpper(validCoverFile1), defaultFileContent, 0644)
 
-	a := &application{
-		fs: aferox.NewAferox("/", fs),
-	}
+	a := newDefaultApplication(aferox.NewAferox("/", fs))
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
