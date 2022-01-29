@@ -9,7 +9,6 @@ import (
 	"github.com/crra/mp3binder/slice"
 
 	"github.com/carolynvs/aferox"
-	"github.com/go-logr/logr"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -70,7 +69,6 @@ type application struct {
 	cwd    string
 	status io.Writer
 
-	log    logr.Logger
 	parent context.Context
 
 	noDiscovery       bool
@@ -81,6 +79,8 @@ type application struct {
 	interlaceFile     string
 	outputPath        string
 	applyTags         string
+	languageStr       string
+	language          language.Tag
 	copyTagsFromIndex int // NOTE: starts on '1' rathen than '0'
 	mediaFiles        []string
 	tags              map[string]string
@@ -108,7 +108,7 @@ const (
 	defaultTrackNumber = "1"
 )
 
-func New(parent context.Context, name, version string, log logr.Logger, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver) Service {
+func New(parent context.Context, name, version string, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver, userLocale string) Service {
 	app := &application{
 		parent:      parent,
 		name:        name,
@@ -123,6 +123,7 @@ func New(parent context.Context, name, version string, log logr.Logger, status i
 			tagEncoderSoftware: fmt.Sprintf("%s %s", name, version),
 			tagIdTrack:         defaultTrackNumber,
 		},
+		languageStr: userLocale,
 	}
 
 	cmd := &cobra.Command{
