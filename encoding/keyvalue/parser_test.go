@@ -36,6 +36,10 @@ func TestParse(t *testing.T) {
 		{title: "Key quoted >'<", input: `'space key'=value`, expected: map[string]string{"space key": "value"}},
 		{title: "Value quoted >'<", input: `key='space value'`, expected: map[string]string{"key": "space value"}},
 
+		// unquoted
+		{title: "Spaces without quote", input: "   key 1 = value 1  ", expected: map[string]string{"key 1": "value 1"}},
+		{title: "Multiple spaces without quote", input: "   key   1 = value   1  ", expected: map[string]string{"key   1": "value   1"}},
+
 		// multiple keys
 		{title: "comma separated", input: "key1=value1,key2=value2", expected: twoValues},
 		{title: "space separated", input: "key1=value1, key2=value2", expected: twoValues},
@@ -64,5 +68,12 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, f.expected, result, "Input: '%s'", f.input)
 			}
 		})
+	}
+}
+
+func TestRegression(t *testing.T) {
+	result, err := StringAsStringMap(`key1 = value 1, key2 = value2`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, map[string]string{"key1": "value 1", "key 2": "value2"}, result, "Input: '%s'")
 	}
 }

@@ -53,11 +53,18 @@ func withThreeValidFiles(fs afero.Fs, path string) []string {
 	return makeFiles(fs, []string{validFileName1, validFileName2, validFileName3}, path)
 }
 
+type testTagResolver struct{}
+
+func (t *testTagResolver) DescriptionFor(string) (string, error) {
+	return "", nil
+}
+
 func newDefaultApplication(fs aferox.Aferox) *application {
 	return &application{
 		fs:            fs,
 		languageStr:   supportedLanguage,
 		statusPrinter: &discardingPrinter{},
+		tagResolver:   &testTagResolver{},
 	}
 }
 

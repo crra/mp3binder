@@ -41,6 +41,10 @@ func StringAsStringMap(input string) (map[string]string, error) {
 			// switch buffer
 			b = &valueB
 		case outsideOfQuote && unicode.In(r, unicode.White_Space):
+			// there was at least one non-whitespace char collected
+			if b.Len() > 0 {
+				b.WriteRune(r)
+			}
 			// whitespace outside of quote, swallow
 		case outsideOfQuote && strings.ContainsRune(pairSeparator, r):
 			// pair separator, swallow
@@ -51,7 +55,7 @@ func StringAsStringMap(input string) (map[string]string, error) {
 		}
 
 		if endOfPair {
-			kv[keyB.String()] = valueB.String()
+			kv[strings.TrimSpace(keyB.String())] = strings.TrimSpace(valueB.String())
 			keyB.Reset()
 			valueB.Reset()
 			b = &keyB
