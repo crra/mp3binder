@@ -49,7 +49,7 @@ func (a *application) run(c *cobra.Command, _ []string) error {
 	}
 
 	// options for the bind process
-	options, optionsCloser, err := a.getOptionsForBinding()
+	options, optionsCloser, err := a.bindingOptions()
 	defer optionsCloser()
 	if err != nil {
 		return err
@@ -115,8 +115,10 @@ func openFilesOnce(fs afero.Fs, files []string) ([]io.ReadSeeker, func(), error)
 	return input, close, nil
 }
 
-func (a *application) getOptionsForBinding() ([]any, func(), error) {
+// bindingOptions returns configuration options for the bind method based on the user input.
+func (a *application) bindingOptions() ([]any, func(), error) {
 	options := []any{}
+
 	var coverFile io.Closer
 	closer := func() {
 		if coverFile != nil {
@@ -124,8 +126,8 @@ func (a *application) getOptionsForBinding() ([]any, func(), error) {
 		}
 	}
 
+	// status visitors
 	if !a.verbose {
-		// status visitors
 		options = append(options,
 			mp3binder.ActionVisitor(a.statusPrinter.actionObserver),
 			mp3binder.BindVisitor(a.statusPrinter.newBindObserver(a.mediaFiles)),
@@ -133,6 +135,7 @@ func (a *application) getOptionsForBinding() ([]any, func(), error) {
 		)
 	}
 
+	// copy tags
 	if a.copyTagsFromIndex > 0 {
 		options = append(options, mp3binder.TagCopyVisitor(
 			a.statusPrinter.newTagCopyObserver(a.mediaFiles[a.copyTagsFromIndex-1])))
@@ -140,22 +143,26 @@ func (a *application) getOptionsForBinding() ([]any, func(), error) {
 
 	// chapter
 	if !a.noChapters {
-		titles := make([]string, len(a.mediaFiles))
+		// contains titles for chapters filled by the id3v2 title of the input file
+		chapterTitles := make([]string, len(a.mediaFiles))
 
-		// Extract the title tag for each media file
+		// Extract the title tag from each media file by collecting the titles
+		// from the file's metadata.
 		options = append(options, mp3binder.MetadataVisitor(func(index int, tags map[string]string) {
-			titles[index] = tags[tagTitle]
-			if titles[index] == "" {
+			chapterTitles[index] = tags[tagTitle]
+
+			if chapterTitles[index] == "" {
 				file := filepath.Base(a.mediaFiles[index])
-				titles[index] = cases.Title(a.language).String(strings.TrimSuffix(file, path.Ext(file)))
+				chapterTitles[index] = cases.Title(a.language).String(strings.TrimSuffix(file, path.Ext(file)))
 			}
 		}))
 
+		// Enable chapters and register a function that provides the name of the chapter.
 		options = append(options, mp3binder.Chapters(func(index, chapterIndex int) (bool, string) {
 			chapterTitle := fmt.Sprintf("Chapter %d", chapterIndex)
-			chapterTitleFromMediaFile := titles[index]
-			if chapterTitleFromMediaFile != "" {
-				chapterTitle = chapterTitleFromMediaFile
+
+			if title := chapterTitles[index]; title != "" {
+				chapterTitle = title
 			}
 
 			return (a.interlaceFile == "") || (a.mediaFiles[index] != a.interlaceFile), chapterTitle
