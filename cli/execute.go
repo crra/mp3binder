@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // run is the cobra way of running the application.
@@ -116,6 +117,11 @@ func openFilesOnce(fs afero.Fs, files []string) ([]io.Reader, func(), error) {
 	return input, close, nil
 }
 
+func titleFromString(language language.Tag, fileName string) string {
+	fileName = filepath.Base(fileName)
+	return cases.Title(language).String(strings.TrimSuffix(fileName, path.Ext(fileName)))
+}
+
 // bindingOptions returns configuration options for the bind method based on the user input.
 func (a *application) bindingOptions() ([]any, func(), error) {
 	options := []any{}
@@ -153,8 +159,7 @@ func (a *application) bindingOptions() ([]any, func(), error) {
 			chapterTitles[index] = tags[tagTitle]
 
 			if chapterTitles[index] == "" {
-				file := filepath.Base(a.mediaFiles[index])
-				chapterTitles[index] = cases.Title(a.language).String(strings.TrimSuffix(file, path.Ext(file)))
+				chapterTitles[index] = titleFromString(a.language, a.mediaFiles[index])
 			}
 		}))
 
@@ -186,9 +191,18 @@ func (a *application) bindingOptions() ([]any, func(), error) {
 	}
 
 	// apply metadata
-	if len(a.tags) > 0 {
-		options = append(options, mp3binder.ApplyTextMetadata(a.tags))
-	}
+	options = append(options, mp3binder.ApplyTextMetadata(func(previous map[string]string) map[string]string {
+		// If the title is not explicitly set (empty erases) or copied from a file from the index,
+		// use the folder name of the first input file.
+		_, explicitlySet := a.tags[tagTitle]
+		_, copied := previous[tagTitle]
+
+		if !explicitlySet && !copied {
+			a.tags[tagTitle] = titleFromString(a.language, filepath.Dir(a.mediaFiles[0]))
+		}
+
+		return a.tags
+	}))
 
 	return options, closer, nil
 }

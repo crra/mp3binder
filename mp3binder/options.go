@@ -130,10 +130,10 @@ func CopyMetadataFrom(index int, errNoTagsInTemplate error) Option {
 }
 
 // ApplyTextMetadata applies key/value pairs of text as metadata to the bounded file.
-func ApplyTextMetadata(tags map[string]string) Option {
+func ApplyTextMetadata(f func(map[string]string) map[string]string) Option {
 	return func() (stage, string, jobProcessor) {
 		return stageApplyMetadata, "applying text metadata", func(j *job) error {
-			for id, value := range tags {
+			for id, value := range f(tagToMap(j.tag)) {
 				description, err := j.tagResolver.DescriptionFor(id)
 				if err != nil {
 					j.tagApplyVisitor(id, "", fmt.Errorf("tag '%s': %w", id, err))
@@ -142,6 +142,7 @@ func ApplyTextMetadata(tags map[string]string) Option {
 				}
 
 				if value == "" {
+					j.tag.DeleteFrames(id)
 					continue
 				}
 
