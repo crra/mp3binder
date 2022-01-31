@@ -23,7 +23,7 @@ type job struct {
 	context   context.Context
 	output    io.WriteSeeker
 	audioOnly io.ReadWriteSeeker
-	inputs    []io.ReadSeeker
+	inputs    []io.Reader
 
 	tagResolver tagResolver
 	tag         *id3v2.Tag
@@ -64,7 +64,7 @@ func New(tagResolver tagResolver) *binder {
 	}
 }
 
-func (b *binder) Bind(parent context.Context, output io.WriteSeeker, audioOnly io.ReadWriteSeeker, input []io.ReadSeeker, o ...any) error {
+func (b *binder) Bind(parent context.Context, output io.WriteSeeker, audioOnly io.ReadWriteSeeker, input []io.Reader, o ...any) error {
 	options := make([]Option, len(o))
 
 	for i, op := range o {
@@ -79,7 +79,7 @@ func (b *binder) Bind(parent context.Context, output io.WriteSeeker, audioOnly i
 	return Bind(parent, b.tagResolver, output, audioOnly, input, options...)
 }
 
-func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker, audioOnly io.ReadWriteSeeker, input []io.ReadSeeker, options ...Option) error {
+func Bind(parent context.Context, tagResolver tagResolver, output io.WriteSeeker, audioOnly io.ReadWriteSeeker, input []io.Reader, options ...Option) error {
 	j := &job{
 		context:   parent,
 		output:    output,
@@ -150,12 +150,6 @@ func bindAudioOnly() (stage, string, jobProcessor) {
 		for fileIndex, reader := range j.inputs {
 			_ = lastBitrate // linter: if there are no frames in the file, this value will never set
 			j.bindVisitor(fileIndex)
-
-			// because intput could be read more then once, the seek cursor is reset
-			// to the beginning of the stream.
-			if _, err := reader.Seek(0, io.SeekStart); err != nil {
-				return err
-			}
 
 			if j.metadata[fileIndex] == nil {
 				j.metadata[fileIndex] = id3v2.NewEmptyTag()

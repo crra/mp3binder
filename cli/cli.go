@@ -74,7 +74,7 @@ type Service interface {
 }
 
 type binder interface {
-	Bind(context.Context, io.WriteSeeker, io.ReadWriteSeeker, []io.ReadSeeker, ...any) error
+	Bind(context.Context, io.WriteSeeker, io.ReadWriteSeeker, []io.Reader, ...any) error
 }
 
 type tagResolver interface {

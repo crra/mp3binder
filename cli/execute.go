@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/crra/mp3binder/io/rewindingreader"
 	"github.com/crra/mp3binder/mp3binder"
 	"github.com/crra/mp3binder/slice"
 	"github.com/spf13/afero"
@@ -84,8 +85,8 @@ func unCamel(s string) string {
 }
 
 // openFilesOnce opens a list of filenames and returns
-func openFilesOnce(fs afero.Fs, files []string) ([]io.ReadSeeker, func(), error) {
-	input := make([]io.ReadSeeker, len(files))
+func openFilesOnce(fs afero.Fs, files []string) ([]io.Reader, func(), error) {
+	input := make([]io.Reader, len(files))
 	openedFiles := make(map[string]afero.File)
 
 	close := func() {
@@ -108,7 +109,7 @@ func openFilesOnce(fs afero.Fs, files []string) ([]io.ReadSeeker, func(), error)
 			return input, func() {}, err
 		}
 
-		input[i] = f
+		input[i] = rewindingreader.New(f)
 		openedFiles[name] = f
 	}
 
