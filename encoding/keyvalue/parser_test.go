@@ -70,10 +70,3 @@ func TestParse(t *testing.T) {
 		})
 	}
 }
-
-func TestRegression(t *testing.T) {
-	result, err := StringAsStringMap(`key1 = value 1, key2 = value2`)
-	if assert.NoError(t, err) {
-		assert.Equal(t, map[string]string{"key1": "value 1", "key 2": "value2"}, result, "Input: '%s'")
-	}
-}
