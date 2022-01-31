@@ -154,6 +154,7 @@ func bindAudioOnly() (stage, string, jobProcessor) {
 				j.metadata[fileIndex] = id3v2.NewEmptyTag()
 			}
 
+		Loop:
 			for i := 0; true; i++ {
 				select {
 				case <-j.context.Done():
@@ -161,7 +162,7 @@ func bindAudioOnly() (stage, string, jobProcessor) {
 				default:
 					obj := mp3lib.NextObject(reader)
 					if obj == nil {
-						break
+						break Loop
 					}
 
 					switch obj := obj.(type) {
