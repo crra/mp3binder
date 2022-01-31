@@ -134,7 +134,7 @@ func (a *application) bindingOptions() ([]any, func(), error) {
 	}
 
 	// status visitors
-	if !a.verbose {
+	if a.verbose {
 		options = append(options,
 			mp3binder.ActionVisitor(a.statusPrinter.actionObserver),
 			mp3binder.BindVisitor(a.statusPrinter.newBindObserver(a.mediaFiles)),
