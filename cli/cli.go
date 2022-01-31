@@ -23,10 +23,12 @@ var (
 	ErrInvalidIndex        = errors.New("the provided index is invalid")
 	ErrTagNonStandard      = errors.New("non-standard tag")
 	ErrUnsupportedLanguage = errors.New("unsupported language")
+	ErrNoTagsInTemplate    = errors.New("no tags in template")
 )
 
 const (
-	flagNoDiscovery   = "nomagic"
+	flagNoDiscovery   = "nodiscovery"
+	flagNoChapters    = "nochapters"
 	flagCover         = "cover"
 	flagVerbose       = "verbose"
 	flagOverwrite     = "force"
@@ -47,6 +49,8 @@ var (
 
 	rootDirectoryName = "root" + outputFileExtension
 )
+
+const tagTitle = "TIT2"
 
 type statusPrinter interface {
 	language(language string)
@@ -91,6 +95,7 @@ type application struct {
 	parent context.Context
 
 	noDiscovery       bool
+	noChapters        bool
 	coverFile         string
 	coverFileMimeType string
 	verbose           bool
@@ -152,8 +157,8 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 		Use:     fmt.Sprintf("%s file1.mp3 file2.mp3", name),
 		Example: fmt.Sprintf("Calling '%[1]s' with no parameters is equivalent to: '%[1]s *.mp3'", name),
 		Version: version,
-		Short:   fmt.Sprintf("%s joins multiple mp3 files into one", name),
-		Long:    fmt.Sprintf("%s is a simple command line utility for concatenating/joining MP3 files without re-encoding.", name),
+		Short:   fmt.Sprintf("%s joins multiple mp3 files into one without re-encoding", name),
+		Long:    fmt.Sprintf("%s joins multiple MP3 files into one without re-encoding. It writes ID3v2 tags and chapters for each file.", name),
 
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -168,7 +173,8 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 	f := cmd.Flags()
 	f.SortFlags = false // prefer the order defined by the code
 
-	f.BoolVar(&app.noDiscovery, flagNoDiscovery, app.noDiscovery, "ignores well-known files (e.g. folder.jpg)")
+	f.BoolVar(&app.noDiscovery, flagNoDiscovery, app.noDiscovery, "no discovery for well-known files (e.g. cover.jpg)")
+	f.BoolVar(&app.noChapters, flagNoChapters, app.noChapters, "does not write chapters for bounded files")
 	f.StringVar(&app.coverFile, flagCover, app.coverFile, "use image file as artwork")
 	f.BoolVar(&app.verbose, flagVerbose, app.verbose, "prints verbose information for each processing step")
 	f.BoolVar(&app.overwrite, flagOverwrite, app.overwrite, "overwrite an existing output file")
