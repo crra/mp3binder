@@ -19,6 +19,7 @@ var (
 	version = "dev-build"
 	name    = "mp3builder"
 	realm   = "mp3builder"
+	url     = "https://github.com/crra/mp3binder"
 )
 
 var defaultLocale = language.AmericanEnglish.String()
@@ -55,7 +56,7 @@ func main() {
 	}
 
 	// run the program and clean up
-	if err := cli.New(context, name, version, os.Stdout, fs, cwd, binder, resolver, userLocale).Execute(); err != nil {
+	if err := cli.New(context, url, name, version, os.Stdout, fs, cwd, binder, resolver, userLocale).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

@@ -132,7 +132,7 @@ const (
 	defaultTrackNumber = "1"
 )
 
-func New(parent context.Context, name, version string, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver, userLocale string) Service {
+func New(parent context.Context, url, name, version string, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver, userLocale string) Service {
 	app := &application{
 		parent:      parent,
 		name:        name,
@@ -147,7 +147,7 @@ func New(parent context.Context, name, version string, status io.Writer, fs afer
 		cwd: cwd,
 
 		tags: map[string]string{
-			tagEncoderSoftware: fmt.Sprintf("%s %s", name, version),
+			tagEncoderSoftware: fmt.Sprintf("%s, %s", url, version),
 			tagIdTrack:         defaultTrackNumber,
 		},
 		languageStr: userLocale,
