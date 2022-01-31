@@ -1,10 +1,33 @@
 # About
 
-_mp3binder_ is a simple command line utility for concatenating/joining MP3 (formally: MPEG-1 Audio Layer III or MPEG-2 Audio Layer III) files without re-encoding.
+_mp3binder_ joins multiple MP3[^1] files into one without re-encoding. It writes ID3v2 tags and chapters[^2] for each file.
 
-Older mp3players e.g. stereos for children are not always capable of playing multiple files of an audio book in the correct order. Joining them into one file removes this limitation.
+## Why?
 
-It is based on: http://www.dmulholl.com/dev/mp3cat.html and adds some more "batteries" like applying id3 tags or determine the output filename based on a given folder or apply an interlace file automatically in a folder if the file is named "\_interlace.mp3".
+Older mp3players (e.g. simple stereos for children), are not always capable of playing multiple files in the correct order. Joining them into one file removes this limitation. Or sometimes a single mp3 file is more practical than a directory of files.
+
+## How
+
+This tool builds upon [Darren Mulholland](https://github.com/dmulholl)'s wonderfully simple [mp3cat](https://github.com/dmulholl/mp3cat) with the corresponding low-level library [mp3lib](https://github.com/dmulholl/mp3lib) which performs all the heavy lifting. The tool adds id3v2 tag support with the help of the [id3v2](https://github.com/bogem/id3v2) library by [Albert Nigmatzianov](https://github.com/bogem).
+
+# Features
+
+_mp3binder_:
+
+- combines multiple mp3 files **without re-encoding**
+- can embed a **cover image** (jpeg, png) to the output file
+  - either via the command line option: `--cover`
+  - or by copying from an input file, e.g. the first file: `--tcopy 1`
+  - or automatically if the folder of the mp3 files contain a `folder.jpg` or `cover.jpg` file
+  - the automation can be disabled with the command line option `--nodiscovery`
+- can add **files between each files** (e.g. silence)
+  - either via the command line option: `--interlace`
+  - or automatically if the folder of the mp3 files contain a `_interlace.mp3` file
+  - the automation can be disabled with the command line option `--nodiscovery`
+- can write **chapters** based on the id3v2 title of the input files
+  - it can be disabled with the command line option: `--nochapters`
+- can write **id3v2 tags** to the output file via the command line option: `--tapply 'TIT2="My Title",TALB="My album"'`
+  - the key can be any valid tag from the [id3v2 standard](https://id3.org/id3v2.3.0#Declared_ID3v2_frames)
 
 # Screenshot
 
@@ -15,22 +38,31 @@ _Note: color added for clarity_
 # Usage
 
 ```
-mp3builder is a simple command line utility for concatenating/joining MP3 files without re-encoding.
+mp3builder joins multiple MP3 files into one without re-encoding.
+It writes ID3v2 tags and chapters for each file.
 
 Usage:
-  mp3builder one.mp3 two.mp3 three.mp3 [flags]
+  mp3builder file1.mp3 file2.mp3 [flags]
+
+Examples:
+Calling 'mp3builder' with no parameters in the directory containing the mp3 files
+is equivalent to: 'mp3builder .', which is the same as 'mp3builder *.mp3' and
+binds all mp3 files to 'foldername.mp3'.
 
 Flags:
-      --nomagic            ignores well-known files (e.g. folder.jpg)
+      --nodiscovery        no discovery for well-known files (e.g. cover.jpg)
+      --nochapters         does not write chapters for bounded files
       --cover string       use image file as artwork
       --verbose            prints verbose information for each processing step
       --force              overwrite an existing output file
       --interlace string   interlace a spacer file (e.g. silence) between each input file
       --output string      output filepath. Defaults to name of the folder of the first file provided
       --tapply string      apply id3v2 tags to output file.
-                           Takes the format: 'key1=value,key2=value'.
+                           Takes the format: 'key1="value",key2="value"'.
                            Keys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames
       --tcopy int          copy the ID3 metadata tag from the n-th input file, starting with 1
+      --lang string        ISO-639 language string used during string manipulation
+                           (e.g. uppercasing non-english languages) (default "en-GB")
   -h, --help               help for mp3builder
   -v, --version            version for mp3builder
 ```
@@ -43,9 +75,9 @@ Files to be merged can be specified as a list of filenames:
 
 Alternatively, an entire directory of .mp3 files can be merged:
 
-- `$ mp3binder` (the program uses the current directory)
-- `$ mp3binder .` (the program reads the directory)
-- `$ mp3binder *.mp3` (the shell expands the files)
+- `$ mp3binder` or `$ mp3binder .` (the current directory is used)
+- `$ mp3binder foo` (the files in the 'foo' directory are used)
+- `$ mp3binder *.mp3` (the shell expands all mp3 files as individual shell-sorted parameters)
 
 ID3 tags can be copied from the n-th input file:
 
@@ -53,7 +85,10 @@ ID3 tags can be copied from the n-th input file:
 
 ID3 tags could also be set manually. The name of the tag must be according to https://id3.org/id3v2.3.0#Declared_ID3v2_frames:
 
-`$ mp3binder --tcopy 1 --tapply 'TRCK=42,TIT2="My sample title"' one.mp3 two.mp3`
+- `$ mp3binder . --tcopy 1 --tapply "TRCK=42,TIT2='My sample title'"`
+- `$ mp3binder . --tapply "TIT2=\"It's like that\""`
+
+Please notice the surrounding quotes and ensure proper quoting.
 
 # Silence between each tracks via interlace file
 
@@ -106,3 +141,6 @@ gotip install golang.org/x/tools/gopls
 VSCode/Codium does not always update the path to use `gotip` for the `go` command. `go version` reports the version string. If an older version is shown, the path could be defined as:
 
 > export set PATH=$(go env GOPATH)/bin:~/sdk/gotip/bin:$PATH
+
+[^1]: formally: MPEG-1 Audio Layer III or MPEG-2 Audio Layer III
+[^2]: [specification](https://id3.org/id3v2-chapters-1.0)

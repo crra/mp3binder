@@ -155,10 +155,10 @@ func New(parent context.Context, url, name, version string, status io.Writer, fs
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("%s file1.mp3 file2.mp3", name),
-		Example: fmt.Sprintf("Calling '%[1]s' with no parameters is equivalent to: '%[1]s *.mp3'", name),
+		Example: fmt.Sprintf("Calling '%[1]s' with no parameters in the directory containing the mp3 files\nis equivalent to: '%[1]s .', which is the same as '%[1]s *.mp3' and\nbinds all mp3 files to 'foldername.mp3'.", name),
 		Version: version,
 		Short:   fmt.Sprintf("%s joins multiple mp3 files into one without re-encoding", name),
-		Long:    fmt.Sprintf("%s joins multiple MP3 files into one without re-encoding. It writes ID3v2 tags and chapters for each file.", name),
+		Long:    fmt.Sprintf("%s joins multiple MP3 files into one without re-encoding.\nIt writes ID3v2 tags and chapters for each file.", name),
 
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -180,9 +180,9 @@ func New(parent context.Context, url, name, version string, status io.Writer, fs
 	f.BoolVar(&app.overwrite, flagOverwrite, app.overwrite, "overwrite an existing output file")
 	f.StringVar(&app.interlaceFile, flagInterlaceFile, app.interlaceFile, "interlace a spacer file (e.g. silence) between each input file")
 	f.StringVar(&app.outputPath, flagOutputFile, app.outputPath, "output filepath. Defaults to name of the folder of the first file provided")
-	f.StringVar(&app.applyTags, flagApplyTags, app.applyTags, "apply id3v2 tags to output file.\nTakes the format: 'key1=value,key2=value'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
+	f.StringVar(&app.applyTags, flagApplyTags, app.applyTags, "apply id3v2 tags to output file.\nTakes the format: 'key1=\"value\",key2=\"value\"'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
 	f.IntVar(&app.copyTagsFromIndex, flagCopyTags, app.copyTagsFromIndex, "copy the ID3 metadata tag from the n-th input file, starting with 1")
-	f.StringVar(&app.languageStr, flagLanguageStr, app.languageStr, "ISO-639 language string used during string manipulation (e.g. uppercase)")
+	f.StringVar(&app.languageStr, flagLanguageStr, app.languageStr, "ISO-639 language string used during string manipulation\n(e.g. uppercasing non-english languages)")
 
 	return app
 }
