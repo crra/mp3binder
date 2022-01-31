@@ -148,7 +148,6 @@ func bindAudioOnly() (stage, string, jobProcessor) {
 		var multipleBitrates bool
 
 		for fileIndex, reader := range j.inputs {
-			_ = lastBitrate // linter: if there are no frames in the file, this value will never set
 			j.bindVisitor(fileIndex)
 
 			if j.metadata[fileIndex] == nil {
@@ -156,47 +155,52 @@ func bindAudioOnly() (stage, string, jobProcessor) {
 			}
 
 			for i := 0; true; i++ {
-				obj := mp3lib.NextObject(reader)
-				if obj == nil {
-					break
-				}
+				select {
+				case <-j.context.Done():
+					return j.context.Err()
+				default:
+					obj := mp3lib.NextObject(reader)
+					if obj == nil {
+						break
+					}
 
-				switch obj := obj.(type) {
-				case *mp3lib.MP3Frame:
-					if i == 0 && (mp3lib.IsXingHeader(obj) || mp3lib.IsVbriHeader(obj)) {
+					switch obj := obj.(type) {
+					case *mp3lib.MP3Frame:
+						if i == 0 && (mp3lib.IsXingHeader(obj) || mp3lib.IsVbriHeader(obj)) {
+							continue
+						}
+
+						if lastBitrate == 0 {
+							lastBitrate = obj.BitRate
+						}
+
+						if !multipleBitrates && lastBitrate != obj.BitRate {
+							multipleBitrates = true
+						}
+
+						if _, err := j.audioOnly.Write(obj.RawBytes); err != nil {
+							return err
+						}
+
+						j.inputDurations[fileIndex] += duration(obj)
+
+						framesCount++
+
+						bytesCount += uint32(len(obj.RawBytes))
+
+					case *mp3lib.ID3v2Tag:
+						tag, err := id3v2.ParseReader(bytes.NewReader(obj.RawBytes), id3v2.Options{Parse: true})
+						if err != nil {
+							return err
+						}
+
+						for id := range tag.AllFrames() {
+							j.metadata[fileIndex].AddFrame(id, tag.GetLastFrame(id))
+						}
+
+					default:
 						continue
 					}
-
-					if lastBitrate == 0 {
-						lastBitrate = obj.BitRate
-					}
-
-					if !multipleBitrates && lastBitrate != obj.BitRate {
-						multipleBitrates = true
-					}
-
-					if _, err := j.audioOnly.Write(obj.RawBytes); err != nil {
-						return err
-					}
-
-					j.inputDurations[fileIndex] += duration(obj)
-
-					framesCount++
-
-					bytesCount += uint32(len(obj.RawBytes))
-
-				case *mp3lib.ID3v2Tag:
-					tag, err := id3v2.ParseReader(bytes.NewReader(obj.RawBytes), id3v2.Options{Parse: true})
-					if err != nil {
-						return err
-					}
-
-					for id := range tag.AllFrames() {
-						j.metadata[fileIndex].AddFrame(id, tag.GetLastFrame(id))
-					}
-
-				default:
-					continue
 				}
 			}
 		}
