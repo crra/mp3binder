@@ -27,5 +27,5 @@ jobs:
           go1.18beta2 mod verify
         env:
           GOPROXY: https://proxy.golang.org
-      #- name: Test
-      #  run: task test
+      - name: Test
+        run: task test
