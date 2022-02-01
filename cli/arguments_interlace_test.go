@@ -5,11 +5,11 @@ package cli
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/carolynvs/aferox"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,11 +19,10 @@ const (
 
 func TestNonExistingInterlaceFile(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.interlaceFile = invalidInterlaceFile
 
 	err := a.args(nil, []string{"."})
@@ -32,13 +31,12 @@ func TestNonExistingInterlaceFile(t *testing.T) {
 
 func TestInvalidInterlaceFile(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+invalidInterlaceFile, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
+	invalidInterlaceFiles := makeFiles(fs, root, invalidInterlaceFile)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
-	a.interlaceFile = invalidInterlaceFile
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
+	a.interlaceFile = invalidInterlaceFiles[0]
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrInvalidFile)
@@ -46,13 +44,14 @@ func TestInvalidInterlaceFile(t *testing.T) {
 
 func TestInterlaceFileIsDir(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	fs.MkdirAll("/"+validInterlaceFile1, 0755)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
-	a.interlaceFile = validInterlaceFile1
+	invalidInterlaceFileDirPath := filepath.Join(root, validInterlaceFile1)
+	fs.MkdirAll(invalidInterlaceFileDirPath, 0755)
+
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
+	a.interlaceFile = invalidInterlaceFileDirPath
 
 	err := a.args(nil, []string{"."})
 	assert.ErrorIs(t, err, ErrInvalidFile)
@@ -68,13 +67,12 @@ func TestValidInterlaceFile(t *testing.T) {
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
 			t.Parallel()
 
-			fs := afero.NewMemMapFs()
-			afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-			afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-			afero.WriteFile(fs, "/"+f, defaultFileContent, 0644)
+			root, fs := newTestFilesystem()
+			_ = withTwoValidFiles(fs, root)
+			interlaceFiles := makeFiles(fs, root, f)
 
-			a := newDefaultApplication(aferox.NewAferox("/", fs))
-			a.interlaceFile = f
+			a := newDefaultApplication(aferox.NewAferox(root, fs))
+			a.interlaceFile = interlaceFiles[0]
 
 			err := a.args(nil, []string{"."})
 			assert.NoError(t, err)
@@ -84,27 +82,25 @@ func TestValidInterlaceFile(t *testing.T) {
 
 func TestDiscoverInterlaceFile(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validInterlaceFile1, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
+	interlaceFiles := makeFiles(fs, root, validInterlaceFile1)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/"+validInterlaceFile1, a.interlaceFile)
+		assert.Equal(t, interlaceFiles[0], a.interlaceFile)
 	}
 }
 
 func TestNoInterlaceFileDiscovery(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validInterlaceFile1, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
+	_ = makeFiles(fs, root, validInterlaceFile1)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.noDiscovery = true
 
 	err := a.args(nil, []string{"."})

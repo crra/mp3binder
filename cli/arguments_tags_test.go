@@ -4,19 +4,17 @@ import (
 	"testing"
 
 	"github.com/carolynvs/aferox"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCopyIndex(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	numberOfFiles := 2
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	files := withTwoValidFiles(fs, root)
+	numberOfFiles := len(files)
 
 	for i := 1; i <= numberOfFiles+1; i++ {
-		a := newDefaultApplication(aferox.NewAferox("/", fs))
+		a := newDefaultApplication(aferox.NewAferox(root, fs))
 		a.copyTagsFromIndex = i
 
 		err := a.args(nil, []string{"."})
@@ -30,9 +28,8 @@ func TestCopyIndex(t *testing.T) {
 
 func TestApplyTags(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	withTwoValidFiles(fs, root)
 
 	for _, f := range []struct {
 		title    string
@@ -81,7 +78,7 @@ func TestApplyTags(t *testing.T) {
 		t.Run(f.title, func(t *testing.T) {
 			t.Parallel()
 
-			a := newDefaultApplication(aferox.NewAferox("/", fs))
+			a := newDefaultApplication(aferox.NewAferox(root, fs))
 			a.applyTags = f.args
 			a.tags = f.primed
 

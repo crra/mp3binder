@@ -2,12 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/carolynvs/aferox"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,42 +21,40 @@ func fileNameWithoutExtension(fileName string) string {
 
 func TestOutputFileNotExisting(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
-	a.outputPath = validOutputFile
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
+	a.outputPath = filepath.Join(root, validOutputFile)
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/"+validOutputFile, a.outputPath)
+		// not changed
+		assert.Equal(t, filepath.Join(root, validOutputFile), a.outputPath)
 	}
 }
 
 func TestOutputFileMissingExtension(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.outputPath = fileNameWithoutExtension(validOutputFile)
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/"+validOutputFile, a.outputPath)
+		assert.Equal(t, filepath.Join(root, validOutputFile), a.outputPath)
 	}
 }
 
 func TestOutputFileExistingNoOverwrite(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validOutputFile, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
+	_ = makeFiles(fs, root, validOutputFile)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.outputPath = validOutputFile
 
 	err := a.args(nil, []string{"."})
@@ -65,18 +63,17 @@ func TestOutputFileExistingNoOverwrite(t *testing.T) {
 
 func TestOutputFileExistingOverwrite(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	afero.WriteFile(fs, "/"+validFileName1, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validFileName2, defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+validOutputFile, defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	_ = withTwoValidFiles(fs, root)
+	outputFiles := makeFiles(fs, root, validOutputFile)
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
-	a.outputPath = validOutputFile
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
+	a.outputPath = outputFiles[0]
 	a.overwrite = true
 
 	err := a.args(nil, []string{"."})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "/"+validOutputFile, a.outputPath)
+		assert.Equal(t, outputFiles[0], a.outputPath)
 	}
 }
 
@@ -94,36 +91,36 @@ func TestAsOutputFile(t *testing.T) {
 
 func TestOutputFileFromSampleDirectory1(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	fs.MkdirAll("/"+sampleDirectory, 0755)
-	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName1), defaultFileContent, 0644)
-	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, validFileName2), defaultFileContent, 0644)
+	root, fs := newTestFilesystem()
+	samplePath := filepath.Join(root, sampleDirectory)
+	fs.MkdirAll(samplePath, 0755)
+	_ = withTwoValidFiles(fs, samplePath)
 
 	for i, f := range []struct {
 		outputPath string
 		expected   string
 	}{
 		{
-			outputPath: "../" + sampleDirectory,
-			expected:   "/" + filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)),
+			outputPath: filepath.Join("..", sampleDirectory),
+			expected:   filepath.Join(samplePath, asOutputFile(sampleDirectory)),
 		},
 		{
-			outputPath: "/" + sampleDirectory,
-			expected:   "/" + filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)),
+			outputPath: samplePath,
+			expected:   filepath.Join(samplePath, asOutputFile(sampleDirectory)),
 		},
 		{
 			outputPath: ".",
-			expected:   "/" + asOutputFile(sampleDirectory),
+			expected:   asOutputFile(samplePath),
 		},
 		{
 			outputPath: "",
-			expected:   "/" + asOutputFile(sampleDirectory),
+			expected:   filepath.Join(root, asOutputFile(sampleDirectory)),
 		},
 	} {
 		f := f // pin
 		t.Run(fmt.Sprintf("Index-%d", i), func(t *testing.T) {
 			t.Parallel()
-			a := newDefaultApplication(aferox.NewAferox("/", fs))
+			a := newDefaultApplication(aferox.NewAferox(root, fs))
 			a.outputPath = f.outputPath
 			a.overwrite = true
 
@@ -139,24 +136,18 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 
 func TestOutputFileFromRootDirectory1(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	fs.MkdirAll("/"+sampleDirectory, 0755)
-	expectedMediaFiles := []string{
-		"/" + validFileName1,
-		"/" + validFileName2,
-	}
+	root, fs := newTestFilesystem()
+	samplePath := filepath.Join(root, sampleDirectory)
+	fs.MkdirAll(samplePath, 0755)
+	expectedMediaFiles := withTwoValidFiles(fs, root)
 
-	for _, f := range expectedMediaFiles {
-		afero.WriteFile(fs, f, defaultFileContent, 0644)
-	}
+	_ = makeFiles(fs, samplePath, asOutputFile(sampleDirectory))
 
-	afero.WriteFile(fs, "/"+filepath.Join(sampleDirectory, asOutputFile(sampleDirectory)), defaultFileContent, 0644)
+	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
-	a := newDefaultApplication(aferox.NewAferox("/", fs))
-
-	err := a.args(nil, []string{"/"})
+	err := a.args(nil, []string{string(os.PathSeparator)})
 	if assert.NoError(t, err) {
-		if assert.Equal(t, "/"+asOutputFile(rootDirectoryName), a.outputPath) {
+		if assert.Equal(t, filepath.Join(root, asOutputFile(rootDirectoryName)), a.outputPath) {
 			if assert.NotContains(t, a.mediaFiles, a.outputPath) {
 				assert.Equal(t, expectedMediaFiles, a.mediaFiles)
 			}
