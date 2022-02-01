@@ -1,5 +1,7 @@
 version: "3"
 
+dotenv: [".env"]
+
 vars:
   FOLDER_DIST: "dist"
 
@@ -16,7 +18,7 @@ tasks:
   setup:
     desc: Install required (go) tools
     cmds:
-      - go install golang.org/x/tools/cmd/stringer
+      - $GO install golang.org/x/tools/cmd/stringer
 
   clean:
     desc: Cleans temp files and folders
@@ -25,7 +27,7 @@ tasks:
 
   stringer:
     cmds:
-      - go generate ./...
+      - $GO generate ./...
 
   build-all:
     desc: Build the binaries for multiple architectures.
@@ -89,7 +91,7 @@ tasks:
   test:
     desc: Perform all tests
     cmds:
-      - go test -cover -race ./...
+      - $GO test -cover -race ./...
 
   build:
     desc: Build the binary for the current architecture.
