@@ -104,24 +104,26 @@ And apply: `mp3bind --interlace silence.mp3 01.mp3 02.mp3`
 
 Building is always more complex then just calling `build` (e.g. adding version information into the binary or naming the binary or optimize the binary by stripping debug information). Instead of a `Makefile`, a `Taskfile.yml` is used that holds the instructions for [Task](https://taskfile.dev). 'Task' is not mandatory but simplifies the workflow. Once installed ([instructions](https://taskfile.dev/#/installation)), 'Task' provides an executable `task` that can be called with custom actions.
 
-For example cross compilation for multiple platforms is achieved with `task build-all`, and for the current platform with `task build`. Plain go would be: `go build .\cmd\mp3builder\` without build time optimizations and settings (e.g. version information).
+For example cross compilation for multiple platforms is achieved with `task build-all`, and for the current platform with `task build`. Plain go would be: `go build .\cmd\tui\` without build time optimizations and settings (e.g. version information).
 
 The `Taskfile.yml` gives good hints which commands and options are executed if the developer don't want to use `task`. In the end 'Task' it's just a simple task runner (collection of commands).
 
 ## Golang 1.18
 
-As of today (January, 2022), golang 1.18 with generics is not yet released. `gotip` installs the latest go build (which includes 1.18):
-
-[Source](https://gist.github.com/nikgalushko/e1b5c85c64653dd554a7a904bbef4eee):
+As of today (January, 2022), golang 1.18 with generics is not yet released, but betas are available. Please refer to: https://go.dev/blog/go1.18beta2
 
 ### Install gotip
 
 ```
-go install golang.org/dl/gotip@latest
-gotip download
+go install golang.org/dl/go1.18beta2@latest
+go1.18beta2 download
 ```
 
 ### Install latest gopls
+
+1. Either in Codium / VS Studio Code: "Go: Install/Update Tools"
+
+2. Or manually. Example for POSIX based systems:
 
 ```
 mkdir /tmp/gopls && cd "$_"
@@ -134,13 +136,7 @@ gotip install golang.org/x/tools/gopls
 
 1. View > Command Palette
 2. Go: choose Go environment
-3. select gotip
-
-### Adapt you path
-
-VSCode/Codium does not always update the path to use `gotip` for the `go` command. `go version` reports the version string. If an older version is shown, the path could be defined as:
-
-> export set PATH=$(go env GOPATH)/bin:~/sdk/gotip/bin:$PATH
+3. select go1.18beta2
 
 [^1]: formally: MPEG-1 Audio Layer III or MPEG-2 Audio Layer III
 [^2]: [specification](https://id3.org/id3v2-chapters-1.0)
