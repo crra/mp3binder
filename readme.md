@@ -115,8 +115,8 @@ As of today (January, 2022), golang 1.18 with generics is not yet released, but 
 ### Install gotip
 
 ```
-go install golang.org/dl/go1.18beta2@latest
-go1.18beta2 download
+go install golang.org/dl/go1.18rc1@latest
+go1.18rc1 download
 ```
 
 ### Install latest gopls
@@ -136,7 +136,7 @@ gotip install golang.org/x/tools/gopls
 
 1. View > Command Palette
 2. Go: choose Go environment
-3. select go1.18beta2
+3. select go1.18rc1
 
 [^1]: formally: MPEG-1 Audio Layer III or MPEG-2 Audio Layer III
 [^2]: [specification](https://id3.org/id3v2-chapters-1.0)

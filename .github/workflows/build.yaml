@@ -1,8 +1,5 @@
-on:
-  push:
-    tags:
-      - "v*"
-name: Create Release
+name: Test, Build and release if tagged
+on: [push]
 jobs:
   build:
     strategy:
@@ -19,21 +16,22 @@ jobs:
         id: go
       - name: install go
         run: |
-          go install golang.org/dl/go1.18beta2@latest
-          go1.18beta2 download
+          go install golang.org/dl/go1.18rc1@latest
+          go1.18rc1 download
       - name: Install Task
         uses: arduino/setup-task@v1
       - uses: actions/checkout@v2
       - name: Download Go modules
         run: |
-          go1.18beta2 mod download
-          go1.18beta2 mod verify
+          go1.18rc1 mod download
+          go1.18rc1 mod verify
         env:
           GOPROXY: https://proxy.golang.org
       - name: Test
         run: task build-all
       - name: Release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             dist/*.zip
