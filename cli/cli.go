@@ -67,8 +67,8 @@ type statusPrinter interface {
 	newTagObserver(tags map[string]string) func(tag, value string, err error)
 }
 
-// Service describes the cli service.
-type Service interface {
+// Application describes the cli service.
+type Application interface {
 	// Execute executes the service.
 	Execute() error
 }
@@ -132,7 +132,7 @@ const (
 	defaultTrackNumber = "1"
 )
 
-func New(parent context.Context, url, name, version string, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver, userLocale string) Service {
+func New(parent context.Context, url, name, version string, status io.Writer, fs afero.Fs, cwd string, binder binder, tagResolver tagResolver, userLocale string) Application {
 	app := &application{
 		parent:      parent,
 		name:        name,

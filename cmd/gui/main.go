@@ -6,8 +6,9 @@ import (
 	"os"
 	"os/signal"
 
+	gio "gioui.org/app"
 	"github.com/cloudfoundry/jibber_jabber"
-	"github.com/crra/mp3binder/cli"
+	"github.com/crra/mp3binder/gui"
 	"github.com/crra/mp3binder/mp3binder"
 	"github.com/crra/mp3binder/mp3binder/tags"
 	"github.com/spf13/afero"
@@ -24,9 +25,6 @@ var (
 
 var defaultLocale = language.AmericanEnglish.String()
 
-// main is the entrypoint of the program.
-// main is the only place where external dependencies (e.g. output stream, logger, filesystem)
-// are resolved and where final errors are handled (e.g. writing to the console).
 func main() {
 	// create a parent context that listens on os signals (e.g. CTRL-C)
 	context, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
@@ -47,7 +45,7 @@ func main() {
 
 	fs := afero.NewOsFs()
 
-	resolver := tags.NewV24(cli.ErrTagNonStandard)
+	resolver := tags.NewV24(gui.ErrTagNonStandard)
 	binder := mp3binder.New(resolver)
 
 	userLocale, err := jibber_jabber.DetectIETF()
@@ -55,9 +53,13 @@ func main() {
 		userLocale = defaultLocale
 	}
 
-	// run the program and clean up
-	if err := cli.New(context, url, name, version, os.Stdout, fs, cwd, binder, resolver, userLocale).Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	go func() {
+		if err := gui.New(context, url, name, version, fs, cwd, binder, resolver, userLocale).Execute(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		os.Exit(0)
+	}()
+	gio.Main()
 }
