@@ -9,7 +9,7 @@ require (
 	github.com/dmulholl/mp3lib v1.0.0
 	github.com/spf13/afero v1.8.2
 	github.com/spf13/cobra v1.3.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	golang.org/x/text v0.3.7
 )
 
