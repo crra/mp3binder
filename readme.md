@@ -108,36 +108,22 @@ For example cross compilation for multiple platforms is achieved with `task buil
 
 The `Taskfile.yml` gives good hints which commands and options are executed if the developer don't want to use `task`. In the end 'Task' it's just a simple task runner (collection of commands).
 
-
 ### Install golang manually
 
 ```
 go install golang.org/dl/go1.18@latest
-go1.18rc1 download
+go1.18 download
 ```
 
 ```
 export set PATH=~/go/bin:$PATH
 alias go=go1.18
 ```
-### Install latest gopls
-
-1. Either in Codium / VS Studio Code: "Go: Install/Update Tools"
-
-2. Or manually. Example for POSIX based systems:
-
-```
-mkdir /tmp/gopls && cd "$_"
-gotip mod init gopls-unstable
-gotip get golang.org/x/tools/gopls@master golang.org/x/tools@master
-gotip install golang.org/x/tools/gopls
-```
-
-### Configure VSCode/Codium
+#### Configure VSCode/Codium
 
 1. View > Command Palette
 2. Go: choose Go environment
-3. select go1.18rc1
+3. select go1.18
 
 [^1]: formally: MPEG-1 Audio Layer III or MPEG-2 Audio Layer III
 [^2]: [specification](https://id3.org/id3v2-chapters-1.0)
