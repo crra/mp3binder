@@ -1,0 +1,18 @@
+version: "3"
+
+tasks:
+  prepare:
+    run: once
+    cmds:
+      - powershell 'if (!(Test-Path "{{.FOLDER_DIST}}")) { New-Item -ItemType Directory -Path "{{.FOLDER_DIST}}" | Out-Null }'
+
+  zip:
+    vars:
+      ZIP_FILE: "{{.FOLDER}}.zip"
+
+    summary: Zips the folder
+    cmds:
+      - powershell 'if (Test-Path "{{.ZIP_FILE}}") { Remove-Item -Path "{{.ZIP_FILE}}" | Out-Null }'
+      - powershell 'Compress-Archive -Path "{{.FOLDER}}/*" -DestinationPath "{{.ZIP_FILE}}"'
+    generates:
+      - "{{.ZIP_FILE}}"

@@ -1,136 +1,84 @@
+# https://taskfile.dev
+
 version: "3"
 
-dotenv: [".env"]
+includes:
+  default:
+    taskfile: ./Taskfile_{{OS}}.yaml
+    optional: true
 
 vars:
   FOLDER_DIST: "dist"
-
   REALM: "mp3binder"
 
-  MP3BINDER_NAME: mp3binder
-  MP3BINDER_MAIN: "./cmd/tui"
+  MP3BINDER_CLI_NAME: mp3binder
+  MP3BINDER_CLI_MAIN: "./cmd/tui"
 
-  # used as version
+  #MP3BINDER_NAME: mp3binder_gui
+  #MP3BINDER_MAIN: "./cmd/gui"
+
   GIT_COMMIT:
     sh: git describe --tags --always | sed 's/-/+/' | sed 's/^v//'
 
 tasks:
-  setup:
-    desc: Install required (go) tools
+  default:
+    desc: Build for the current platform
     cmds:
-      - $GO install golang.org/x/tools/cmd/stringer
+      - task: default:build
 
-  clean:
-    desc: Cleans temp files and folders
+  default:setup:
+    desc: Install required tools that are not part of go.mod
     cmds:
-      - rm -rf {{.FOLDER_DIST}}
+      - go install golang.org/x/tools/cmd/stringer
 
-  stringer:
+  default:generate:
+    desc: Runs code generation
     cmds:
-      - $GO generate ./...
+      - go generate ./...
 
-  build-all:
-    desc: Build the binaries for multiple architectures.
-    deps:
-      - clean
-      - test
+  default:prepare:
+    run: once
+    summary: Prepares the dist folder
     cmds:
-      # macOS intel
-      - task: build-for
-        vars:
-          {
-            NAME: "{{.MP3BINDER_NAME}}",
-            MAIN: "{{.MP3BINDER_MAIN}}",
-            GOOS: "darwin",
-            GOARCH: "amd64",
-            EXTENSION: "",
-          }
-      - task: zip
-        vars: { NAME: "darwin_amd64" }
-      # macOS Apple silicon
-      - task: build-for
-        vars:
-          {
-            NAME: "{{.MP3BINDER_NAME}}",
-            MAIN: "{{.MP3BINDER_MAIN}}",
-            GOOS: "darwin",
-            GOARCH: "arm64",
-            EXTENSION: "",
-          }
-      - task: zip
-        vars: { NAME: "darwin_arm64" }
-      - '{{if eq OS "darwin"}}
-        mkdir -p {{.FOLDER_DIST}}/darwin_universal &&
-        lipo -create -output {{.FOLDER_DIST}}/darwin_universal/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_amd64/{{.MP3BINDER_NAME}} {{.FOLDER_DIST}}/darwin_arm64/{{.MP3BINDER_NAME}} &&
-        cd {{.FOLDER_DIST}}/darwin_universal/ && zip -r "../darwin_universal.zip" .
-        {{end}}'
-      # linux 64
-      - task: build-for
-        vars:
-          {
-            NAME: "{{.MP3BINDER_NAME}}",
-            MAIN: "{{.MP3BINDER_MAIN}}",
-            GOOS: "linux",
-            GOARCH: "amd64",
-            EXTENSION: "",
-          }
-      - task: zip
-        vars: { NAME: "linux_amd64" }
-      # windows 64
-      - task: build-for
-        vars:
-          {
-            NAME: "{{.MP3BINDER_NAME}}",
-            MAIN: "{{.MP3BINDER_MAIN}}",
-            GOOS: "windows",
-            GOARCH: "amd64",
-            EXTENSION: ".exe",
-          }
-      - task: zip
-        vars: { NAME: "windows_amd64" }
-  test:
-    desc: Perform all tests
-    cmds:
-      - $GO test -cover -race ./...
+      - mkdir -p {{.FOLDER_DIST}}
 
-  build:
-    desc: Build the binary for the current architecture.
-    deps:
-      - clean
-      - test
+  default:test:
+    run: once
+    summary: Performs all tests
     cmds:
-      - task: build-for
-        vars:
-          {
-            NAME: "{{.MP3BINDER_NAME}}",
-            MAIN: "{{.MP3BINDER_MAIN}}",
-            GOOS: "{{OS}}",
-            GOARCH: "{{ARCH}}",
-            EXTENSION: "{{exeExt}}",
-          }
-      - task: zip
-        vars: { NAME: "{{OS}}_{{ARCH}}" }
+      - go test -cover -race ./...
 
-  zip:
+  default:build-for-nonstatic:
     vars:
-      FOLDER: "{{.FOLDER_DIST}}/{{.NAME}}"
-    summary: Zips the folder
+      ARCH_FOLDER: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}"
+      OUTPUT: "{{.ARCH_FOLDER}}/{{.NAME}}{{.EXTENSION}}"
+
     cmds:
-      - cd "${FOLDER}" && zip -r "../${NAME}.zip" .
+      - >-
+        go build -trimpath
+        -ldflags="-w -s
+        -X main.name="{{.NAME}}{{.EXTENSION}}"
+        -X main.version="{{.GIT_COMMIT}}"
+        -X main.realm="{{.REALM}}""
+        -a
+        -buildvcs=false
+        -o {{.OUTPUT}}
+        {{.MAIN}}
+
     generates:
-      - "{{.FOLDER_DIST}}/{{.NAME}}.zip"
+      - "{{.OUTPUT}}"
+
     env:
-      NAME: "{{.NAME}}"
-      FOLDER: "{{.FOLDER}}"
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      GOARM: "{{.GOARM}}"
 
-  build-for:
+  default:build-for:
     vars:
-      FOLDER: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}"
-      OUTPUT: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}/{{.NAME}}{{.EXTENSION}}"
+      ARCH_FOLDER: "{{.FOLDER_DIST}}/{{.GOOS}}_{{.GOARCH}}"
+      OUTPUT: "{{.ARCH_FOLDER}}/{{.NAME}}{{.EXTENSION}}"
 
-    summary: Build the binary for a given platform
     cmds:
-      - mkdir -p "{{.FOLDER}}"
       - >-
         go build -trimpath
         -ldflags="-w -s
@@ -144,12 +92,131 @@ tasks:
 
     generates:
       - "{{.OUTPUT}}"
+
     env:
-      NAME: "{{.NAME}}"
-      MAIN: "{{.MAIN}}"
       GOOS: "{{.GOOS}}"
       GOARCH: "{{.GOARCH}}"
       GOARM: "{{.GOARM}}"
-      EXTENSION: "{{.EXTENSION}}"
-      GIT_COMMIT: "{{.GIT_COMMIT}}"
-      REALM: "{{.REALM}}"
+
+  tui:build:
+    summary: Builds the TUI interface for the current platform
+    vars:
+      ARCH_FOLDER: "{{.FOLDER_DIST}}/{{OS}}_{{ARCH}}"
+
+    deps:
+      - default:prepare
+      - default:test
+
+    cmds:
+      - task: default:build-for
+        vars:
+          NAME: "{{.MP3BINDER_CLI_NAME}}"
+          MAIN: "{{.MP3BINDER_CLI_MAIN}}"
+          GOOS: "{{OS}}"
+          GOARCH: "{{ARCH}}"
+          EXTENSION: "{{exeExt}}"
+
+  #gui:build:
+  #  summary: Builds the GUI interface for the current platform
+  #  vars:
+  #    ARCH_FOLDER: "{{.FOLDER_DIST}}/{{OS}}_{{ARCH}}"
+  #
+  #  deps:
+  #    - default:prepare
+  #    - default:test
+  #
+  #  cmds:
+  #    - task: default:build-for-nonstatic
+  #      vars:
+  #        NAME: "{{.MP3BINDER_NAME}}"
+  #        MAIN: "{{.MP3BINDER_MAIN}}"
+  #        GOOS: "{{OS}}"
+  #        GOARCH: "{{ARCH}}"
+  #        EXTENSION: "{{exeExt}}"
+
+  default:build:
+    summary: Builds for the current platform
+    vars:
+      ARCH_FOLDER: "{{.FOLDER_DIST}}/{{OS}}_{{ARCH}}"
+
+    deps:
+      - default:prepare
+      - default:test
+
+    cmds:
+      - task: tui:build
+      #- task: gui:build
+
+  default:zip:
+    summary: Zips the folder
+    cmds:
+      - cd "{{.FOLDER}}" && zip -r "../$(basename {{.FOLDER}}).zip" .
+    generates:
+      - "{{.FOLDER}}.zip"
+
+  default:build-all:
+    desc: Build the binaries for multiple architectures.
+    deps:
+      - default:prepare
+      - default:test
+
+    cmds:
+      # macOS intel
+      - task: default:build-for
+        vars:
+          NAME: "{{.MP3BINDER_CLI_NAME}}"
+          MAIN: "{{.MP3BINDER_CLI_MAIN}}"
+          GOOS: "darwin"
+          GOARCH: "amd64"
+          EXTENSION: ""
+
+      - task: default:zip
+        vars:
+          FOLDER: "{{.FOLDER_DIST}}/darwin_amd64"
+
+      # macOS Apple silicon
+      - task: default:build-for
+        vars:
+          NAME: "{{.MP3BINDER_CLI_NAME}}"
+          MAIN: "{{.MP3BINDER_CLI_MAIN}}"
+          GOOS: "darwin"
+          GOARCH: "arm64"
+          EXTENSION: ""
+
+      - task: default:zip
+        vars:
+          FOLDER: "{{.FOLDER_DIST}}/darwin_arm64"
+
+      # TODO: move to specific build
+      - >-
+        {{if eq OS "darwin"}}
+        mkdir -p {{.FOLDER_DIST}}/darwin_universal &&
+        lipo -create -output {{.FOLDER_DIST}}/darwin_universal/{{.MP3BINDER_CLI_NAME}} {{.FOLDER_DIST}}/darwin_amd64/{{.MP3BINDER_CLI_NAME}} {{.FOLDER_DIST}}/darwin_arm64/{{.MP3BINDER_CLI_NAME}} &&
+        cd {{.FOLDER_DIST}}/darwin_universal/ && zip -r "../darwin_universal.zip" .
+        {{end}}
+
+      # linux 64
+      - task: default:build-for
+        vars:
+          NAME: "{{.MP3BINDER_CLI_NAME}}"
+          MAIN: "{{.MP3BINDER_CLI_MAIN}}"
+          GOOS: "linux"
+          GOARCH: "amd64"
+          EXTENSION: ""
+
+      - task: default:zip
+        vars:
+          FOLDER: "{{.FOLDER_DIST}}/linux_amd64"
+
+      # windows 64
+      - task: default:build-for
+        vars:
+          NAME: "{{.MP3BINDER_CLI_NAME}}"
+          MAIN: "{{.MP3BINDER_CLI_MAIN}}"
+          GOOS: "windows"
+          GOARCH: "amd64"
+          EXTENSION: ".exe"
+
+      - task: default:zip
+        vars:
+          FOLDER: "{{.FOLDER_DIST}}/windows_amd64"
