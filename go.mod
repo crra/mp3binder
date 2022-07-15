@@ -7,7 +7,7 @@ require (
 	github.com/cloudfoundry/jibber_jabber v0.0.0-20151120183258-bcc4c8345a21
 	github.com/crra/id3v2/v2 v2.1.2-pre
 	github.com/dmulholl/mp3lib v1.0.0
-	github.com/spf13/afero v1.8.2
+	github.com/spf13/afero v1.9.0
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/text v0.3.7
