@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       title:
-        description: 'Title of the release'
-        default: 'PRE: '
- 
+        description: "Title of the release"
+        default: "PRE: "
+
 jobs:
   release:
     name: Release
@@ -16,7 +16,7 @@ jobs:
       matrix:
         go-version: [1.19]
         platform: [ubuntu-latest, windows-latest, macos-latest]
-      
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
@@ -27,21 +27,21 @@ jobs:
 
       - name: Install Task
         uses: arduino/setup-task@v1
-      
+
       - name: Download Go modules
         run: |
           go mod download
           go mod verify
         env:
           GOPROXY: https://proxy.golang.org
-      
+
       - name: Build
         run: task default:build-all
-      
+
       - name: Release
-          uses: softprops/action-gh-release@v1
-          if: startsWith(github.ref, 'refs/tags/')
-          with:
-              draft: true
-              generate_release_notes: true
-              files: dist/*.zip
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true
+          generate_release_notes: true
+          files: dist/*.zip
