@@ -1,25 +1,37 @@
 name: Build
+
 on:
+  push:
   pull_request:
+
 jobs:
   build:
+    name: Build
+
+    runs-on: ${{matrix.os}}
     strategy:
       matrix:
         go-version: [1.19]
-        platform: [macos-latest]
-      runs-on: ${{matrix.platform}}
-      steps:
-        - uses: actions/checkout@v2
-        - uses: actions/setup-go@v3
-          with:
-            go-version: ${{matrix.go-version}}
-        - name: Install Task
-          uses: arduino/setup-task@v1
-        - name: Download Go modules
-          run: |
-            go mod download
-            go mod verify
-          env:
-            GOPROXY: https://proxy.golang.org
-        - name: Test
-          run: task default:build
+        os: [macos-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        id: go
+        with:
+          go-version: ${{matrix.go-version}}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install Task
+        uses: arduino/setup-task@v1
+
+      - name: Download Go modules
+        run: |
+          go mod download
+          go mod verify
+        env:
+          GOPROXY: https://proxy.golang.org
+
+      - name: Build
+        run: task default:build-all
