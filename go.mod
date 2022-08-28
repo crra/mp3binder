@@ -1,6 +1,6 @@
 module github.com/crra/mp3binder
 
-go 1.18
+go 1.19
 
 require (
 	github.com/carolynvs/aferox v0.3.0
