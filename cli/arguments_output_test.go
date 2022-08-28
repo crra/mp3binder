@@ -52,7 +52,7 @@ func TestOutputFileExistingNoOverwrite(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	_ = makeFiles(fs, root, validOutputFile)
+	_ = makeEmptyFiles(fs, root, validOutputFile)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.outputPath = validOutputFile
@@ -65,7 +65,7 @@ func TestOutputFileExistingOverwrite(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	outputFiles := makeFiles(fs, root, validOutputFile)
+	outputFiles := makeEmptyFiles(fs, root, validOutputFile)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.outputPath = outputFiles[0]
@@ -93,7 +93,7 @@ func TestOutputFileFromSampleDirectory1(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	samplePath := filepath.Join(root, sampleDirectory)
-	fs.MkdirAll(samplePath, 0755)
+	fs.MkdirAll(samplePath, 0o755)
 	_ = withTwoValidFiles(fs, samplePath)
 
 	for i, f := range []struct {
@@ -138,10 +138,10 @@ func TestOutputFileFromRootDirectory1(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	samplePath := filepath.Join(root, sampleDirectory)
-	fs.MkdirAll(samplePath, 0755)
+	fs.MkdirAll(samplePath, 0o755)
 	expectedMediaFiles := withTwoValidFiles(fs, root)
 
-	_ = makeFiles(fs, samplePath, asOutputFile(sampleDirectory))
+	_ = makeEmptyFiles(fs, samplePath, asOutputFile(sampleDirectory))
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 

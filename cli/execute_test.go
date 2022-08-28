@@ -86,7 +86,7 @@ func TestInterlaceWithTwo(t *testing.T) {
 	tc := &testCollector{}
 	root, fs := newTestFilesystem()
 	mediaFiles := withTwoValidFiles(fs, root)
-	_ = makeFiles(fs, root, validInterlaceFile1, validInterlaceFile2)
+	_ = makeEmptyFiles(fs, root, validInterlaceFile1, validInterlaceFile2)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -107,7 +107,7 @@ func TestInterlaceWithThree(t *testing.T) {
 	tc := &testCollector{}
 	root, fs := newTestFilesystem()
 	mediaFiles := withThreeValidFiles(fs, root)
-	_ = makeFiles(fs, root, validInterlaceFile1, validInterlaceFile2)
+	_ = makeEmptyFiles(fs, root, validInterlaceFile1, validInterlaceFile2)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.binder = tc

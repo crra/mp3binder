@@ -57,6 +57,7 @@ Flags:
       --force              overwrite an existing output file
       --interlace string   interlace a spacer file (e.g. silence) between each input file
       --output string      output filepath. Defaults to name of the folder of the first file provided
+      --input string       file containing a list of input files
       --tapply string      apply id3v2 tags to output file.
                            Takes the format: 'key1="value",key2="value"'.
                            Keys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames
@@ -78,6 +79,10 @@ Alternatively, an entire directory of .mp3 files can be merged:
 - `$ mp3binder` or `$ mp3binder .` (the current directory is used)
 - `$ mp3binder foo` (the files in the 'foo' directory are used)
 - `$ mp3binder *.mp3` (the shell expands all mp3 files as individual shell-sorted parameters)
+
+A file containing the names in a custom order:
+
+- `$ mp3binder --input files.txt`
 
 ID3 tags can be copied from the n-th input file:
 
@@ -104,7 +109,7 @@ And apply: `mp3bind --interlace silence.mp3 01.mp3 02.mp3`
 
 Building is always more complex then just calling `build` (e.g. adding version information into the binary or naming the binary or optimize the binary by stripping debug information). Instead of a `Makefile`, a `Taskfile.yml` is used that holds the instructions for [Task](https://taskfile.dev). 'Task' is not mandatory but simplifies the workflow. Once installed ([instructions](https://taskfile.dev/#/installation)), 'Task' provides an executable `task` that can be called with custom actions.
 
-For example cross compilation for multiple platforms is achieved with `task build-all`, and for the current platform with `task build`. Plain go would be: `go build .\cmd\tui\` without build time optimizations and settings (e.g. version information).
+For example cross compilation for multiple platforms is achieved with `task default:build-all`, and for the current platform with `task default:build` or just `task`. Plain go would be: `go build .\cmd\tui\` without build time optimizations and settings (e.g. version information).
 
 The `Taskfile.yml` gives good hints which commands and options are executed if the developer don't want to use `task`. In the end 'Task' it's just a simple task runner (collection of commands).
 
@@ -119,6 +124,7 @@ go1.18 download
 export set PATH=~/go/bin:$PATH
 alias go=go1.18
 ```
+
 #### Configure VSCode/Codium
 
 1. View > Command Palette

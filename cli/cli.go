@@ -34,6 +34,7 @@ const (
 	flagOverwrite     = "force"
 	flagInterlaceFile = "interlace"
 	flagOutputFile    = "output"
+	flagInputFile     = "input"
 	flagApplyTags     = "tapply"
 	flagCopyTags      = "tcopy"
 	flagLanguageStr   = "lang"
@@ -102,6 +103,7 @@ type application struct {
 	overwrite         bool
 	interlaceFile     string
 	outputPath        string
+	inputFile         string
 	applyTags         string
 	languageStr       string
 	language          language.Tag
@@ -180,6 +182,7 @@ func New(parent context.Context, url, name, version string, status io.Writer, fs
 	f.BoolVar(&app.overwrite, flagOverwrite, app.overwrite, "overwrite an existing output file")
 	f.StringVar(&app.interlaceFile, flagInterlaceFile, app.interlaceFile, "interlace a spacer file (e.g. silence) between each input file")
 	f.StringVar(&app.outputPath, flagOutputFile, app.outputPath, "output filepath. Defaults to name of the folder of the first file provided")
+	f.StringVar(&app.inputFile, flagInputFile, app.inputFile, "file containing a list of input files")
 	f.StringVar(&app.applyTags, flagApplyTags, app.applyTags, "apply id3v2 tags to output file.\nTakes the format: 'key1=\"value\",key2=\"value\"'.\nKeys should be from https://id3.org/id3v2.3.0#Declared_ID3v2_frames")
 	f.IntVar(&app.copyTagsFromIndex, flagCopyTags, app.copyTagsFromIndex, "copy the ID3 metadata tag from the n-th input file, starting with 1")
 	f.StringVar(&app.languageStr, flagLanguageStr, app.languageStr, "ISO-639 language string used during string manipulation\n(e.g. uppercasing non-english languages)")
