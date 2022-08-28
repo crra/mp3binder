@@ -27,7 +27,7 @@ const (
 	validInterlaceFile2 = "_interlace.mp3"
 )
 
-var defaultFileContent = []byte{}
+var emptyFileContent = []byte{}
 
 func filepathJoin(path string, files ...string) []string {
 	mediaFiles := make([]string, len(files))
@@ -38,20 +38,20 @@ func filepathJoin(path string, files ...string) []string {
 	return mediaFiles
 }
 
-func makeFiles(fs afero.Fs, path string, files ...string) []string {
+func makeEmptyFiles(fs afero.Fs, path string, files ...string) []string {
 	for _, f := range files {
-		afero.WriteFile(fs, filepath.Join(path, f), defaultFileContent, 0644)
+		afero.WriteFile(fs, filepath.Join(path, f), emptyFileContent, 0o644)
 	}
 
 	return filepathJoin(path, files...)
 }
 
 func withTwoValidFiles(fs afero.Fs, path string) []string {
-	return makeFiles(fs, path, validFileName1, validFileName2)
+	return makeEmptyFiles(fs, path, validFileName1, validFileName2)
 }
 
 func withThreeValidFiles(fs afero.Fs, path string) []string {
-	return makeFiles(fs, path, validFileName1, validFileName2, validFileName3)
+	return makeEmptyFiles(fs, path, validFileName1, validFileName2, validFileName3)
 }
 
 type testTagResolver struct{}
@@ -72,12 +72,12 @@ func newDefaultApplication(fs aferox.Aferox) *application {
 func newTestFilesystem() (string, afero.Fs) {
 	fs := afero.NewMemMapFs()
 
-	root, err := filepath.Abs("/")
+	root, err := filepath.Abs(afero.FilePathSeparator)
 	if err != nil {
 		panic("can't get root")
 	}
 
-	fs.MkdirAll(root, 0755)
+	fs.MkdirAll(root, 0o755)
 
 	return root, fs
 }
@@ -103,7 +103,7 @@ func TestDirectoryWithNonExistingDirectory(t *testing.T) {
 func TestDirectoryWithNonExistingFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, validFileName1)
+	_ = makeEmptyFiles(fs, root, validFileName1)
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
 	err := a.args(nil, []string{validFileName1, validFileName2})
@@ -113,7 +113,7 @@ func TestDirectoryWithNonExistingFile(t *testing.T) {
 func TestDirectoryWithNoValidFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, invalidFileName1, invalidFileName2)
+	_ = makeEmptyFiles(fs, root, invalidFileName1, invalidFileName2)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -124,7 +124,7 @@ func TestDirectoryWithNoValidFile(t *testing.T) {
 func TestDirectoryWithOneFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, validFileName1)
+	_ = makeEmptyFiles(fs, root, validFileName1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -150,7 +150,7 @@ func TestDirectoryWithTwoFiles(t *testing.T) {
 
 			root, fs := newTestFilesystem()
 
-			mediaFiles := makeFiles(fs, root, f...)
+			mediaFiles := makeEmptyFiles(fs, root, f...)
 
 			a := newDefaultApplication(aferox.NewAferox(root, fs))
 			a.overwrite = true
@@ -179,7 +179,7 @@ func TestNoParametersDefaultsToDirectory(t *testing.T) {
 func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, validFileName1, validFileName2, validInterlaceFile1, validInterlaceFile2)
+	_ = makeEmptyFiles(fs, root, validFileName1, validFileName2, validInterlaceFile1, validInterlaceFile2)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.overwrite = true
@@ -197,7 +197,7 @@ func TestDirectoryWithTwoFilesAndExplicitlyUsedMagicInterlaceFile(t *testing.T) 
 func TestSubDirectoryWithTwoFiles(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	fs.MkdirAll(filepath.Join(root, sampleDirectory), 0755)
+	fs.MkdirAll(filepath.Join(root, sampleDirectory), 0o755)
 	_ = withTwoValidFiles(fs, filepath.Join(root, sampleDirectory))
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
@@ -209,7 +209,7 @@ func TestSubDirectoryWithTwoFiles(t *testing.T) {
 func TestOneFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, validFileName1)
+	_ = makeEmptyFiles(fs, root, validFileName1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -220,7 +220,7 @@ func TestOneFile(t *testing.T) {
 func TestOneInvalidFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, invalidFileName1)
+	_ = makeEmptyFiles(fs, root, invalidFileName1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -254,8 +254,8 @@ func TestFileNotFound(t *testing.T) {
 func TestOneFileAndDirectory(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, validFileName1)
-	fs.MkdirAll(filepath.Join(root, validFileName2), 0755)
+	_ = makeEmptyFiles(fs, root, validFileName1)
+	fs.MkdirAll(filepath.Join(root, validFileName2), 0o755)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -308,7 +308,7 @@ func TestFilesAndDirectoryUniqueWithExtraFromDirectoryLast(t *testing.T) {
 func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirst(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	mediaFilesOrdered := makeFiles(fs, root, validFileName3, validFileName2, validFileName1)
+	mediaFilesOrdered := makeEmptyFiles(fs, root, validFileName3, validFileName2, validFileName1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.overwrite = true
@@ -322,7 +322,7 @@ func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirst(t *testing.T) {
 func TestFilesAndDirectoryUniqueWithExtraFromDirectoryFirstAndLast(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	mediaFilesOrdered := makeFiles(fs, root, validFileName3, validFileName2, validFileName1)
+	mediaFilesOrdered := makeEmptyFiles(fs, root, validFileName3, validFileName2, validFileName1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.overwrite = true

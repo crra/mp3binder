@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	fs2 "io/fs"
@@ -29,6 +30,17 @@ func (a *application) args(c *cobra.Command, args []string) error {
 	}
 
 	a.statusPrinter.language(a.language.String())
+
+	// Treat an input file as list of arguments.
+	// Any explicitly set argument has order priority over the input file argument.
+	if a.inputFile != "" {
+		argsFromInputFile, err := getInputFileAsList(a.fs, a.inputFile)
+		if err != nil {
+			return err
+		}
+
+		args = append(args, argsFromInputFile...)
+	}
 
 	mediaFiles, outputCandidateName, err := getMediaFilesFromArguments(a.fs, args)
 	if err != nil {
@@ -113,6 +125,52 @@ func isAcceptedMediaFile(path string, skipInterlaceFiles bool) bool {
 	}
 
 	return slice.Contains(mediaFileExtensions, strings.ToLower(filepath.Ext(path)))
+}
+
+// getInputFileAsList takes the content of an input file provides it as a list. An empty
+// file is treated as an error.
+func getInputFileAsList(fs aferox.Aferox, inputFile string) ([]string, error) {
+	abs := fs.Abs(inputFile)
+	exists, err := fs.Exists(abs)
+	switch {
+	case err != nil:
+		return nil, err
+	case !exists:
+		return nil, fmt.Errorf("'%s': %w", abs, ErrFileNotFound)
+	}
+
+	isDir, err := fs.IsDir(abs)
+	switch {
+	case err != nil:
+		return nil, err
+	case isDir:
+		return nil, fmt.Errorf("file is a directory '%s': %w", abs, ErrInvalidFile)
+	}
+
+	isEmpty, err := fs.IsEmpty(abs)
+	switch {
+	case err != nil:
+		return nil, err
+	case isEmpty:
+		return nil, fmt.Errorf("file is empty '%s': %w", abs, ErrInvalidFile)
+	}
+
+	// File content as simple string array
+	f, err := fs.Open(inputFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	s.Split(bufio.ScanLines)
+	args := []string{}
+
+	for s.Scan() {
+		args = append(args, s.Text())
+	}
+
+	return args, nil
 }
 
 // getMediaFilesFromArguments takes the program arguments and either accepts the argument as a file or if the argument
@@ -296,10 +354,12 @@ func getOutputFile(fs aferox.Aferox, outputPath string, overwrite bool, candidat
 	}
 }
 
+// hasOutputFileExtension takes a filename and checks it the output file extension is present.
 func hasOutputFileExtension(fileName string) bool {
 	return strings.ToLower(filepath.Ext(fileName)) == outputFileExtension
 }
 
+// asOutputFile takes a filename and converts it to an output file name.
 func asOutputFile(fileName string) string {
 	if !hasOutputFileExtension(fileName) {
 		fileName += outputFileExtension

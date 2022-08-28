@@ -33,7 +33,7 @@ func TestInvalidInterlaceFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	invalidInterlaceFiles := makeFiles(fs, root, invalidInterlaceFile)
+	invalidInterlaceFiles := makeEmptyFiles(fs, root, invalidInterlaceFile)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.interlaceFile = invalidInterlaceFiles[0]
@@ -48,7 +48,7 @@ func TestInterlaceFileIsDir(t *testing.T) {
 	_ = withTwoValidFiles(fs, root)
 
 	invalidInterlaceFileDirPath := filepath.Join(root, validInterlaceFile1)
-	fs.MkdirAll(invalidInterlaceFileDirPath, 0755)
+	fs.MkdirAll(invalidInterlaceFileDirPath, 0o755)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.interlaceFile = invalidInterlaceFileDirPath
@@ -69,7 +69,7 @@ func TestValidInterlaceFile(t *testing.T) {
 
 			root, fs := newTestFilesystem()
 			_ = withTwoValidFiles(fs, root)
-			interlaceFiles := makeFiles(fs, root, f)
+			interlaceFiles := makeEmptyFiles(fs, root, f)
 
 			a := newDefaultApplication(aferox.NewAferox(root, fs))
 			a.interlaceFile = interlaceFiles[0]
@@ -84,7 +84,7 @@ func TestDiscoverInterlaceFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	interlaceFiles := makeFiles(fs, root, validInterlaceFile1)
+	interlaceFiles := makeEmptyFiles(fs, root, validInterlaceFile1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -98,7 +98,7 @@ func TestNoInterlaceFileDiscovery(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	_ = makeFiles(fs, root, validInterlaceFile1)
+	_ = makeEmptyFiles(fs, root, validInterlaceFile1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.noDiscovery = true

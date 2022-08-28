@@ -32,7 +32,7 @@ func TestNonExistingCoverFile(t *testing.T) {
 func TestInvalidCoverFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
-	_ = makeFiles(fs, root, validFileName1, validFileName2, invalidCoverFile)
+	_ = makeEmptyFiles(fs, root, validFileName1, validFileName2, invalidCoverFile)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.coverFile = invalidCoverFile
@@ -45,8 +45,8 @@ func TestCoverFileIsDir(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 
-	_ = makeFiles(fs, root, validFileName1, validFileName2)
-	fs.MkdirAll(filepath.Join(root, validCoverFile1), 0755)
+	_ = makeEmptyFiles(fs, root, validFileName1, validFileName2)
+	fs.MkdirAll(filepath.Join(root, validCoverFile1), 0o755)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.coverFile = validCoverFile1
@@ -68,7 +68,7 @@ func TestValidCoverFile(t *testing.T) {
 		strings.ToUpper(validCoverFile2),
 		strings.ToUpper(validCoverFile3),
 	} {
-		mediaFile := makeFiles(fs, root, f)
+		mediaFile := makeEmptyFiles(fs, root, f)
 
 		a := newDefaultApplication(aferox.NewAferox(root, fs))
 		a.coverFile = mediaFile[0]
@@ -82,7 +82,7 @@ func TestDiscoverCoverFile(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	coverFiles := makeFiles(fs, root, validCoverFile1)
+	coverFiles := makeEmptyFiles(fs, root, validCoverFile1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
@@ -96,7 +96,7 @@ func TestNoCoverFileDiscovery(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	_ = makeFiles(fs, root, validCoverFile1)
+	_ = makeEmptyFiles(fs, root, validCoverFile1)
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 	a.noDiscovery = true
@@ -111,7 +111,7 @@ func TestDiscoverCoverFileUppercased(t *testing.T) {
 	t.Parallel()
 	root, fs := newTestFilesystem()
 	_ = withTwoValidFiles(fs, root)
-	coverFiles := makeFiles(fs, root, strings.ToUpper(validCoverFile1))
+	coverFiles := makeEmptyFiles(fs, root, strings.ToUpper(validCoverFile1))
 
 	a := newDefaultApplication(aferox.NewAferox(root, fs))
 
