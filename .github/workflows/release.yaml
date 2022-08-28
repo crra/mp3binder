@@ -1,7 +1,12 @@
 name: Release
 
-on: workflow_dispatch
-
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'Title of the release'
+        default: 'PRE: '
+ 
 jobs:
   release:
     name: Release
