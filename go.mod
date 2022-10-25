@@ -8,7 +8,7 @@ require (
 	github.com/crra/id3v2/v2 v2.1.2-pre
 	github.com/dmulholl/mp3lib v1.0.0
 	github.com/spf13/afero v1.9.2
-	github.com/spf13/cobra v1.5.0
+	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/text v0.3.7
 )
