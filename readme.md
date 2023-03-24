@@ -113,18 +113,6 @@ For example cross compilation for multiple platforms is achieved with `task defa
 
 The `Taskfile.yml` gives good hints which commands and options are executed if the developer don't want to use `task`. In the end 'Task' it's just a simple task runner (collection of commands).
 
-### Install golang manually
-
-```
-go install golang.org/dl/go1.18@latest
-go1.18 download
-```
-
-```
-export set PATH=~/go/bin:$PATH
-alias go=go1.18
-```
-
 #### Configure VSCode/Codium
 
 1. View > Command Palette
